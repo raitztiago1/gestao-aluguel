@@ -1,0 +1,2 @@
+-- Flyway migration placeholder: criar tabelas iniciais
+-- Edite este arquivo conforme o esquema desejado
