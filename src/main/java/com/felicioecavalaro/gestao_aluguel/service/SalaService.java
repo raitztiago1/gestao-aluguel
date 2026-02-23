@@ -1,11 +1,13 @@
 package com.felicioecavalaro.gestao_aluguel.service;
 
-import com.felicioecavalaro.gestao_aluguel.domain.Sala;
-import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import com.felicioecavalaro.gestao_aluguel.domain.Sala;
+import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
