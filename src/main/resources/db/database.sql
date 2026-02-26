@@ -2,7 +2,7 @@
 -- DATABASE: gestao_aluguel
 -- =====================================================
 
--- Criação do banco (execute apenas se necessário)
+
 -- CREATE DATABASE gestao_aluguel;
 
 -- =====================================================
@@ -128,6 +128,10 @@ CREATE TRIGGER update_sala_updated_at
 
 -- =====================================================
 -- TABELA: locatario (Regra 3.2)
+
+-- **** TODO -> VALIDARO QUE É NECESSÁRIO PARA PESSOA FÍSICA, SE CONSTA NO CONTRATO DATA DE NASCIMENTO, CASO NÃO MUDAR APENAS PARA IDENTIDADE E NOME OBRIGATÓRIO.
+ 
+
 -- =====================================================
 CREATE TABLE locatario (
     id SERIAL PRIMARY KEY,
@@ -318,6 +322,8 @@ CREATE TABLE aditivo (
 
 -- =====================================================
 -- TABELA: cobranca (Regra 6.1)
+
+-- TODO -> CADA REGRA DE COBRANÇA É ESTIPULADA POR CONTRATO INDEPENDENTE, VALIDAR COM OS CONTRATOS QUAL A REGRA PARA READEQUAR A TABELA.
 -- =====================================================
 CREATE TABLE cobranca (
     id SERIAL PRIMARY KEY,
