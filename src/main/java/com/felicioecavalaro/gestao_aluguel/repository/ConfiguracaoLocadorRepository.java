@@ -3,8 +3,8 @@ package com.felicioecavalaro.gestao_aluguel.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.felicioecavalaro.gestao_aluguel.domain.Terreno;
+import com.felicioecavalaro.gestao_aluguel.domain.ConfiguracaoLocador;
 
 @Repository
-public interface TerrenoRepository extends JpaRepository<Terreno, Long> {
+public interface ConfiguracaoLocadorRepository extends JpaRepository<ConfiguracaoLocador, Long> {
 }
