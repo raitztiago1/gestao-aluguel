@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.felicioecavalaro.gestao_aluguel.domain.Locatario;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.repository.LocatarioRepository;
 
 import lombok.RequiredArgsConstructor;

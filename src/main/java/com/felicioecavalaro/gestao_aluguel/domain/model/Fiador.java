@@ -1,4 +1,4 @@
-package com.felicioecavalaro.gestao_aluguel.domain;
+package com.felicioecavalaro.gestao_aluguel.domain.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

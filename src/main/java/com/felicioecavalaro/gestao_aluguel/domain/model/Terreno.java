@@ -1,6 +1,8 @@
-package com.felicioecavalaro.gestao_aluguel.domain;
+package com.felicioecavalaro.gestao_aluguel.domain.model;
 
 import java.math.BigDecimal;
+
+import com.felicioecavalaro.gestao_aluguel.domain.enums.TipoTerreno;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

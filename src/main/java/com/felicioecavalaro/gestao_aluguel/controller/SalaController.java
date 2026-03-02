@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.felicioecavalaro.gestao_aluguel.domain.Sala;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
 import com.felicioecavalaro.gestao_aluguel.service.SalaService;
 
 import lombok.RequiredArgsConstructor;

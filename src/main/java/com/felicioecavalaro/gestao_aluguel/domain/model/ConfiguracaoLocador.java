@@ -1,4 +1,4 @@
-package com.felicioecavalaro.gestao_aluguel.domain;
+package com.felicioecavalaro.gestao_aluguel.domain.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

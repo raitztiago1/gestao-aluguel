@@ -1,6 +1,9 @@
-package com.felicioecavalaro.gestao_aluguel.domain;
+package com.felicioecavalaro.gestao_aluguel.domain.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+
+import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusCaucao;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,29 +22,44 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "sala")
+@Table(name = "caucao")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Sala {
+public class Caucao {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "terreno_id", nullable = false)
-    private Terreno terreno;
+    @JoinColumn(name = "locatario_id", nullable = false)
+    private Locatario locatario;
 
-    @Column(name = "identificacao", nullable = false)
-    private String identificacao;
+    @Column(name = "valor", nullable = false)
+    private BigDecimal valor;
 
-    @Column(name = "metragem", nullable = false)
-    private BigDecimal metragem;
+    @Column(name = "tipo", nullable = false, length = 50)
+    private String tipo;
+
+    @Column(name = "descricao", columnDefinition = "text")
+    private String descricao;
+
+    @Column(name = "data_deposito", nullable = false)
+    private LocalDate dataDeposito;
+
+    @Column(name = "data_previsao_devolucao")
+    private LocalDate dataPrevisaoDevolucao;
+
+    @Column(name = "data_devolucao")
+    private LocalDate dataDevolucao;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private StatusSala status;
+    private StatusCaucao status;
+
+    @Column(name = "comprovante_url", columnDefinition = "text")
+    private String comprovanteUrl;
 
     @Column(name = "observacoes", columnDefinition = "text")
     private String observacoes;
