@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
@@ -27,104 +27,50 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      background: '#f2f2f2'
-    }}>
-      <form onSubmit={handleSubmit} style={{
-        background: 'white',
-        padding: '2rem',
-        borderRadius: '0.6rem',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        width: '300px'
-      }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Login - Gestão de Aluguel</h2>
+    <div className='auth-page'>
+      <div className='auth-card'>
+        <h2 className='auth-title'>Login</h2>
+        <p className='auth-subtitle'>Acesse o sistema de gestão de aluguel de forma segura.</p>
 
-        {erro && <p style={{ color: 'red', textAlign: 'center', marginBottom: '1rem' }}>{erro}</p>}
+        {erro && <div className='alert-card alert-error'>{erro}</div>}
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem' }}>Login:</label>
-          <input
-            type="text"
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-            required
-          />
-        </div>
+        <form onSubmit={handleSubmit} className='form-grid'>
+          <div className='form-group'>
+            <label>Login</label>
+            <input
+              className='input-field'
+              type='text'
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              required
+            />
+          </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem' }}>Senha:</label>
-          <input
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-            required
-          />
-        </div>
+          <div className='form-group'>
+            <label>Senha</label>
+            <input
+              className='input-field'
+              type='password'
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              required
+            />
+          </div>
 
-        <button type="submit" style={{
-          width: '100%',
-          padding: '0.75rem',
-          background: '#0070f3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '1rem'
-        }}>
-          Entrar
-        </button>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem' }}>
-          <button
-            type="button"
-            onClick={() => router.push('/register')}
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              background: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Cadastrar
+          <button type='submit' className='button button-primary'>
+            Entrar
           </button>
-          <button
-            type="button"
-            onClick={() => router.push('/forgot-password')}
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              background: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Esqueceu a senha
-          </button>
-        </div>
-      </form>
+
+          <div className='auth-actions'>
+            <button type='button' className='button button-secondary' onClick={() => router.push('/register')}>
+              Cadastrar
+            </button>
+            <button type='button' className='button button-outline' onClick={() => router.push('/forgot-password')}>
+              Esqueceu a senha
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

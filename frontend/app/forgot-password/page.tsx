@@ -6,37 +6,11 @@ export default function ForgotPassword() {
   const router = useRouter();
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      background: '#f2f2f2'
-    }}>
-      <div style={{
-        background: 'white',
-        padding: '2rem',
-        borderRadius: '0.6rem',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        width: '320px',
-        textAlign: 'center'
-      }}>
-        <h2>Esqueceu a senha</h2>
-        <p>Recuperação de senha não implementada. Entre em contato com o administrador ou tente novamente com suas credenciais.</p>
-        <button
-          type="button"
-          onClick={() => router.push('/login')}
-          style={{
-            marginTop: '1rem',
-            width: '100%',
-            padding: '0.75rem',
-            background: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
+    <div className='auth-page'>
+      <div className='auth-card'>
+        <h2 className='auth-title'>Esqueceu a senha</h2>
+        <p className='auth-subtitle'>Recuperação de senha não implementada. Entre em contato com o administrador ou tente novamente com suas credenciais.</p>
+        <button type='button' className='button button-primary' onClick={() => router.push('/login')}>
           Voltar ao login
         </button>
       </div>
