@@ -12,6 +12,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,10 +32,12 @@ public class Terreno {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotNull(message = "Tipo de terreno é obrigatório")
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo", nullable = false)
     private TipoTerreno tipo;
 
+    @NotBlank(message = "Endereço é obrigatório")
     @Column(name = "endereco", nullable = false, columnDefinition = "text")
     private String endereco;
 
@@ -44,15 +50,20 @@ public class Terreno {
     @Column(name = "bairro")
     private String bairro;
 
+    @NotBlank(message = "Cidade é obrigatória")
     @Column(name = "cidade", nullable = false)
     private String cidade;
 
+    @NotBlank(message = "Estado é obrigatório")
+    @Size(min = 2, max = 2, message = "Estado deve ter 2 caracteres")
     @Column(name = "estado", length = 2, nullable = false)
     private String estado;
 
     @Column(name = "cep")
     private String cep;
 
+    @NotNull(message = "Metragem total é obrigatória")
+    @DecimalMin(value = "0.01", inclusive = true, message = "Metragem total deve ser maior que zero")
     @Column(name = "metragem_total", nullable = false)
     private BigDecimal metragemTotal;
 

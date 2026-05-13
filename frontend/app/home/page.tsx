@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type Contrato = {
   id: number;
@@ -38,13 +39,16 @@ export default function Home() {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    const logado = localStorage.getItem('logado');
-    if (logado === 'true') {
-      setIsLoggedIn(true);
-      carregarContratos();
-    } else {
+    if (!isSessionValid()) {
+      clearSession();
       router.push('/login');
+      return;
     }
+
+    setIsLoggedIn(true);
+    carregarContratos();
+    const cleanup = setupUnloadLogout();
+    return cleanup;
   }, [router]);
 
   const carregarContratos = async () => {
@@ -61,7 +65,7 @@ export default function Home() {
   };
 
   const logout = () => {
-    localStorage.removeItem('logado');
+    clearSession();
     setIsLoggedIn(false);
     router.push('/login');
   };

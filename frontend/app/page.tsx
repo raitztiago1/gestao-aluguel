@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { clearSession, isSessionValid } from './lib/session';
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const logado = localStorage.getItem('logado');
-    if (logado === 'true') {
+    if (isSessionValid()) {
       router.push('/home');
     } else {
+      clearSession();
       router.push('/login');
     }
   }, [router]);

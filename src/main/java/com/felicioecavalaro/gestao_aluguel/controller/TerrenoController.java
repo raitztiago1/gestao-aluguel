@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Terreno;
 import com.felicioecavalaro.gestao_aluguel.service.TerrenoService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -36,12 +37,12 @@ public class TerrenoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Terreno create(@RequestBody Terreno terreno) {
+    public Terreno create(@Valid @RequestBody Terreno terreno) {
         return service.create(terreno);
     }
 
     @PutMapping("/{id}")
-    public Terreno update(@PathVariable Long id, @RequestBody Terreno terreno) {
+    public Terreno update(@PathVariable Long id, @Valid @RequestBody Terreno terreno) {
         return service.update(id, terreno);
     }
 

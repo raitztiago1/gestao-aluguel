@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { clearSession, createSession, isSessionValid } from '../lib/session';
 
 export default function Login() {
   const [login, setLogin] = useState('');
@@ -9,10 +10,16 @@ export default function Login() {
   const [erro, setErro] = useState('');
   const router = useRouter();
 
+  useEffect(() => {
+    if (!isSessionValid()) {
+      clearSession();
+    }
+  }, []);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (login === 'admin' && senha === 'admin') {
-      localStorage.setItem('logado', 'true');
+      createSession();
       router.push('/home');
     } else {
       setErro('Login ou senha incorretos');
@@ -85,9 +92,38 @@ export default function Login() {
           Entrar
         </button>
 
-        <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
-          Esqueceu a senha? | Cadastrar
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => router.push('/register')}
+            style={{
+              flex: 1,
+              padding: '0.75rem',
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Cadastrar
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/forgot-password')}
+            style={{
+              flex: 1,
+              padding: '0.75rem',
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Esqueceu a senha
+          </button>
+        </div>
       </form>
     </div>
   );
