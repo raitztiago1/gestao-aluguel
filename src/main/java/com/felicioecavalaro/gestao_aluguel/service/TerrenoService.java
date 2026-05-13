@@ -2,6 +2,7 @@ package com.felicioecavalaro.gestao_aluguel.service;
 
 import java.util.List;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.felicioecavalaro.gestao_aluguel.domain.model.Terreno;
@@ -18,14 +19,26 @@ public class TerrenoService {
         return repo.findAll();
     }
 
-    /**
-     * Método simples para persistir um terreno no banco de dados.
-     * Útil para testes de escrita a partir de camadas superiores.
-     *
-     * @param terreno entidade a ser gravada
-     * @return a entidade persistida com o id gerado
-     */
+    public Terreno findById(Long id) {
+        return repo.findById(id).orElseThrow(() -> new EntityNotFoundException("Terreno não encontrado: " + id));
+    }
+
     public Terreno create(Terreno terreno) {
         return repo.save(terreno);
+    }
+
+    public Terreno update(Long id, Terreno terreno) {
+        if (!repo.existsById(id)) {
+            throw new EntityNotFoundException("Terreno não encontrado: " + id);
+        }
+        terreno.setId(id);
+        return repo.save(terreno);
+    }
+
+    public void delete(Long id) {
+        if (!repo.existsById(id)) {
+            throw new EntityNotFoundException("Terreno não encontrado: " + id);
+        }
+        repo.deleteById(id);
     }
 }
