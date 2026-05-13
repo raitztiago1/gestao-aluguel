@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
@@ -117,6 +117,53 @@ export default function CRUD() {
 
   const [formTerreno, setFormTerreno] = useState<TerrenoForm>(defaultTerrenoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
+  const lastCepRef = useRef('');
+
+  const fieldMissing = (value: string) => !value.trim();
+
+  const formatCep = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    if (digits.length > 5) {
+      return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    }
+    return digits;
+  };
+
+  const lookupCep = async (cepDigits: string) => {
+    try {
+      setErro(null);
+      const response = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
+      if (!response.ok) {
+        throw new Error('Erro ao consultar CEP');
+      }
+      const data = await response.json();
+      if (data.erro) {
+        throw new Error('CEP não encontrado');
+      }
+      setFormTerreno((s) => ({
+        ...s,
+        endereco: data.logradouro || s.endereco,
+        bairro: data.bairro || s.bairro,
+        cidade: data.localidade || s.cidade,
+        estado: data.uf || s.estado
+      }));
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Falha ao consultar CEP');
+    }
+  };
+
+  const handleCepChange = async (value: string) => {
+    const formatted = formatCep(value);
+    const digits = formatted.replace(/\D/g, '');
+    setFormTerreno((s) => ({ ...s, cep: formatted }));
+    if (digits.length === 8 && digits !== lastCepRef.current) {
+      lastCepRef.current = digits;
+      await lookupCep(digits);
+    }
+    if (digits.length < 8) {
+      lastCepRef.current = '';
+    }
+  };
 
   useEffect(() => {
     if (!isSessionValid()) {
@@ -220,122 +267,220 @@ export default function CRUD() {
 
   return (
     <main className='container'>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Gestão de Aluguel - CRUD</h1>
-        <button onClick={voltarParaHome} style={{
-          padding: '0.5rem 1rem',
-          background: '#6c757d',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}>
-          ← Voltar para Home
-        </button>
+      <header className='page-header'>
+        <div>
+          <h1 className='page-title'>Gestão de Aluguel - CRUD</h1>
+          <p className='page-subtitle'>Cadastro e visualização rápida de terrenos, salas, locatários e contratos.</p>
+        </div>
+        <div className='button-group'>
+          <button type='button' className='button button-secondary' onClick={voltarParaHome}>
+            ← Voltar para Home
+          </button>
+        </div>
       </header>
 
-      <p>API base: {API_BASE}</p>
+      <p className='small-text'>API base: {API_BASE}</p>
 
-      {carregando && <p>Carregando...</p>}
-      {erro && <p style={{ color: 'red' }}>{erro}</p>}
+      {carregando && <div className='alert-card'>Carregando...</div>}
+      {erro && <div className='alert-card alert-error'>{erro}</div>}
 
       <section className='card'>
-        <h2>Terrenos (CRUD)</h2>
-        <form onSubmit={salvarTerreno} style={{ marginBottom: '1rem', display: 'grid', gap: '1rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <label>
-              Tipo:
-              <select value={formTerreno.tipo} onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))} required>
+        <div className='page-header'>
+          <div>
+            <h2>Terrenos (CRUD)</h2>
+            <p className='page-subtitle'>Insira ou edite terrenos com informações completas e navegação clara.</p>
+          </div>
+          <div className='button-group'>
+            <button type='button' className='button button-outline' onClick={resetForm}>
+              Limpar formulário
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={salvarTerreno} className='form-grid'>
+          <div className='form-grid-two'>
+            <div className='form-group'>
+              <label>Tipo <span className='required-star'>*</span></label>
+              <select
+                className={`select-field${fieldMissing(formTerreno.tipo) ? ' invalid' : ''}`}
+                value={formTerreno.tipo}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))}
+                required
+              >
                 <option value='COMERCIAL'>Comercial</option>
                 <option value='RESIDENCIAL'>Residencial</option>
               </select>
-            </label>
+            </div>
 
-            <label>
-              Endereço:
-              <input type='text' value={formTerreno.endereco} onChange={(e) => setFormTerreno((s) => ({ ...s, endereco: e.target.value }))} required />
-            </label>
+            <div className='form-group'>
+              <label>CEP</label>
+              <input
+                className='input-field'
+                type='text'
+                value={formTerreno.cep}
+                onChange={(e) => void handleCepChange(e.target.value)}
+                placeholder='00000-000'
+                maxLength={9}
+              />
+            </div>
 
-            <label>
-              Número:
-              <input type='text' value={formTerreno.numero} onChange={(e) => setFormTerreno((s) => ({ ...s, numero: e.target.value }))} />
-            </label>
+            <div className='form-group'>
+              <label>Endereço <span className='required-star'>*</span></label>
+              <input
+                className={`input-field${fieldMissing(formTerreno.endereco) ? ' invalid' : ''}`}
+                type='text'
+                value={formTerreno.endereco}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, endereco: e.target.value }))}
+                required
+              />
+            </div>
 
-            <label>
-              Complemento:
-              <input type='text' value={formTerreno.complemento} onChange={(e) => setFormTerreno((s) => ({ ...s, complemento: e.target.value }))} />
-            </label>
+            <div className='form-group'>
+              <label>Número</label>
+              <input
+                className='input-field'
+                type='text'
+                value={formTerreno.numero}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, numero: e.target.value }))}
+              />
+            </div>
 
-            <label>
-              Bairro:
-              <input type='text' value={formTerreno.bairro} onChange={(e) => setFormTerreno((s) => ({ ...s, bairro: e.target.value }))} />
-            </label>
+            <div className='form-group'>
+              <label>Complemento</label>
+              <input
+                className='input-field'
+                type='text'
+                value={formTerreno.complemento}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, complemento: e.target.value }))}
+              />
+            </div>
 
-            <label>
-              Cidade:
-              <input type='text' value={formTerreno.cidade} onChange={(e) => setFormTerreno((s) => ({ ...s, cidade: e.target.value }))} required />
-            </label>
+            <div className='form-group'>
+              <label>Bairro</label>
+              <input
+                className='input-field'
+                type='text'
+                value={formTerreno.bairro}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, bairro: e.target.value }))}
+              />
+            </div>
 
-            <label>
-              Estado:
-              <input type='text' value={formTerreno.estado} onChange={(e) => setFormTerreno((s) => ({ ...s, estado: e.target.value.toUpperCase() }))} maxLength={2} required />
-            </label>
+            <div className='form-group'>
+              <label>Cidade <span className='required-star'>*</span></label>
+              <input
+                className={`input-field${fieldMissing(formTerreno.cidade) ? ' invalid' : ''}`}
+                type='text'
+                value={formTerreno.cidade}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, cidade: e.target.value }))}
+                required
+              />
+            </div>
 
-            <label>
-              CEP:
-              <input type='text' value={formTerreno.cep} onChange={(e) => setFormTerreno((s) => ({ ...s, cep: e.target.value }))} />
-            </label>
+            <div className='form-group'>
+              <label>Estado <span className='required-star'>*</span></label>
+              <input
+                className={`input-field${fieldMissing(formTerreno.estado) ? ' invalid' : ''}`}
+                type='text'
+                value={formTerreno.estado}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, estado: e.target.value.toUpperCase() }))}
+                maxLength={2}
+                required
+              />
+            </div>
 
-            <label>
-              Metragem total:
-              <input type='number' step='0.01' min='0' value={formTerreno.metragemTotal} onChange={(e) => setFormTerreno((s) => ({ ...s, metragemTotal: e.target.value }))} required />
-            </label>
+            <div className='form-group'>
+              <label>Metragem total <span className='required-star'>*</span></label>
+              <input
+                className={`input-field${fieldMissing(formTerreno.metragemTotal) ? ' invalid' : ''}`}
+                type='number'
+                step='0.01'
+                min='0'
+                value={formTerreno.metragemTotal}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, metragemTotal: e.target.value }))}
+                required
+              />
+            </div>
           </div>
 
           {formTerreno.tipo === 'COMERCIAL' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-              <label>
-                Vagas garagem:
-                <input type='number' min='0' value={formTerreno.vagasGaragem} onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))} required />
-              </label>
-              <label>
-                Quantidade salas:
-                <input type='number' min='0' value={formTerreno.quantidadeSalas} onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))} required />
-              </label>
-              <label>
-                Metragem salas:
-                <input type='number' step='0.01' min='0' value={formTerreno.metragemSalas} onChange={(e) => setFormTerreno((s) => ({ ...s, metragemSalas: e.target.value }))} required />
-              </label>
+            <div className='form-grid-three'>
+                <div className='form-group'>
+                <label>Vagas garagem <span className='required-star'>*</span></label>
+                <input
+                  className={`input-field${fieldMissing(formTerreno.vagasGaragem) ? ' invalid' : ''}`}
+                  type='number'
+                  min='0'
+                  value={formTerreno.vagasGaragem}
+                  onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className='form-group'>
+                <label>Quantidade salas <span className='required-star'>*</span></label>
+                <input
+                  className={`input-field${fieldMissing(formTerreno.quantidadeSalas) ? ' invalid' : ''}`}
+                  type='number'
+                  min='0'
+                  value={formTerreno.quantidadeSalas}
+                  onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className='form-group'>
+                <label>Metragem salas <span className='required-star'>*</span></label>
+                <input
+                  className={`input-field${fieldMissing(formTerreno.metragemSalas) ? ' invalid' : ''}`}
+                  type='number'
+                  step='0.01'
+                  min='0'
+                  value={formTerreno.metragemSalas}
+                  onChange={(e) => setFormTerreno((s) => ({ ...s, metragemSalas: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
           )}
 
           {formTerreno.tipo === 'RESIDENCIAL' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-              <label>
-                Metragem casa:
-                <input type='number' step='0.01' min='0' value={formTerreno.metragemCasa} onChange={(e) => setFormTerreno((s) => ({ ...s, metragemCasa: e.target.value }))} required />
-              </label>
+            <div className='form-grid-two'>
+              <div className='form-group'>
+                <label>Metragem casa <span className='required-star'>*</span></label>
+                <input
+                  className={`input-field${fieldMissing(formTerreno.metragemCasa) ? ' invalid' : ''}`}
+                  type='number'
+                  step='0.01'
+                  min='0'
+                  value={formTerreno.metragemCasa}
+                  onChange={(e) => setFormTerreno((s) => ({ ...s, metragemCasa: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
           )}
 
-          <label>
-            Observações:
-            <textarea value={formTerreno.observacoes} onChange={(e) => setFormTerreno((s) => ({ ...s, observacoes: e.target.value }))} rows={3} />
-          </label>
+          <div className='form-group'>
+            <label>Observações</label>
+            <textarea
+              className='textarea-field'
+              value={formTerreno.observacoes}
+              onChange={(e) => setFormTerreno((s) => ({ ...s, observacoes: e.target.value }))}
+              rows={4}
+            />
+          </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button type='submit' style={{ padding: '0.75rem 1.25rem', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-              {modoEdicao ? 'Atualizar' : 'Criar'} terreno
+          <div className='form-actions'>
+            <button type='submit' className='button button-primary'>
+              {modoEdicao ? 'Atualizar terreno' : 'Criar terreno'}
             </button>
             {modoEdicao && (
-              <button type='button' onClick={resetForm} style={{ padding: '0.75rem 1.25rem', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              <button type='button' className='button button-secondary' onClick={resetForm}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
 
-        <table>
+        <table className='table'>
           <thead>
             <tr>
               <th>ID</th>
@@ -362,11 +507,11 @@ export default function CRUD() {
                     ? `Vagas: ${terreno.vagasGaragem ?? '—'} • Salas: ${terreno.quantidadeSalas ?? '—'} • Metragem salas: ${terreno.metragemSalas ?? '—'}`
                     : `Metragem casa: ${terreno.metragemCasa ?? '—'}`}
                 </td>
-                <td>
-                  <button onClick={() => editarTerreno(terreno)} style={{ marginRight: '0.5rem' }}>
+                <td className='table-actions'>
+                  <button type='button' className='button button-outline' onClick={() => editarTerreno(terreno)}>
                     Editar
                   </button>
-                  <button onClick={() => excluirTerreno(terreno.id)}>
+                  <button type='button' className='button button-secondary' onClick={() => excluirTerreno(terreno.id)}>
                     Excluir
                   </button>
                 </td>
@@ -378,7 +523,7 @@ export default function CRUD() {
 
       <section className='card'>
         <h2>Salas ({salas.length})</h2>
-        <table>
+        <table className='table'>
           <thead>
             <tr>
               <th>ID</th>
@@ -402,7 +547,7 @@ export default function CRUD() {
 
       <section className='card'>
         <h2>Locatários ({locatarios.length})</h2>
-        <table>
+        <table className='table'>
           <thead>
             <tr>
               <th>ID</th>
@@ -426,7 +571,7 @@ export default function CRUD() {
 
       <section className='card'>
         <h2>Contratos ({contratos.length})</h2>
-        <table>
+        <table className='table'>
           <thead>
             <tr>
               <th>ID</th>
