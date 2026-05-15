@@ -6,15 +6,15 @@ import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import { useCepLookup } from '../hooks/useCepLookup';
 import { fetchJson, requestJson } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import {
   formatAddressLine,
   formatCpfCnpjDisplay,
   formatPhoneDisplay,
   labelTipoPessoa
 } from '../lib/format';
-import { getErrorMessage } from '../lib/errors';
-import { useCepLookup } from '../hooks/useCepLookup';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
@@ -128,6 +128,61 @@ export default function LocatariosPage() {
     return cleanup;
   }, [router]);
 
+  // Helper function to validate CPF
+  const isValidCpf = (cpf: string): boolean => {
+    cpf = cpf.replace(/[^\d]+/g, '');
+    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+    for (let t = 9; t < 11; t++) {
+      let sum = 0;
+      for (let i = 0; i < t; i++) {
+        sum += parseInt(cpf[i]) * (t + 1 - i);
+      }
+      let digito = (sum * 10) % 11;
+      if (digito === 10) digito = 0;
+      if (digito !== parseInt(cpf[t])) return false;
+    }
+    return true;
+  };
+
+  // Helper function to validate CNPJ
+  const isValidCnpj = (cnpj: string): boolean => {
+    cnpj = cnpj.replace(/[^\d]+/g, '');
+    if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
+
+    const validarDigito = (base: string, peso: number[]): boolean => {
+      let soma = 0;
+      for (let i = 0; i < base.length; i++) {
+        soma += parseInt(base[i]) * peso[i];
+      }
+      let resto = soma % 11;
+      let digito = resto < 2 ? 0 : 11 - resto;
+      return digito === parseInt(base[base.length - 1]);
+    };
+
+    const peso1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const peso2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+
+    // Valida o primeiro dígito verificador
+    let cnpjSemDigitos = cnpj.substring(0, 12);
+    let digito1 = cnpj.substring(12, 13);
+    let soma1 = 0;
+    for (let i = 0; i < 12; i++) {
+      soma1 += parseInt(cnpjSemDigitos.charAt(i)) * peso1[i];
+    }
+    let resultado1 = soma1 % 11 < 2 ? 0 : 11 - (soma1 % 11);
+    if (resultado1 !== parseInt(digito1)) return false;
+
+    // Valida o segundo dígito verificador
+    let cnpjComDigito1 = cnpj.substring(0, 13);
+    let digito2 = cnpj.substring(13, 14);
+    let soma2 = 0;
+    for (let i = 0; i < 13; i++) {
+      soma2 += parseInt(cnpjComDigito1.charAt(i)) * peso2[i];
+    }
+    let resultado2 = soma2 % 11 < 2 ? 0 : 11 - (soma2 % 11);
+    return resultado2 === parseInt(digito2);
+  };
+
   const carregarDados = async () => {
     try {
       setCarregando(true);
@@ -147,6 +202,18 @@ export default function LocatariosPage() {
       const payload = {
         tipoPessoa: formLocatario.tipoPessoa,
         nome: formLocatario.nome.trim(),
+        // CPF/CNPJ validation
+        ...(() => {
+          const rawCpfCnpj = onlyDigits(formLocatario.cpfCnpj);
+          if (formLocatario.tipoPessoa === 'FISICA' && !isValidCpf(rawCpfCnpj)) {
+            throw new Error('CPF inválido.');
+          }
+          if (formLocatario.tipoPessoa === 'JURIDICA' && !isValidCnpj(rawCpfCnpj)) {
+            throw new Error('CNPJ inválido.');
+          }
+          return {};
+        })(),
+
         cpfCnpj: onlyDigits(formLocatario.cpfCnpj),
         email: formLocatario.email.trim(),
         telefone: onlyDigits(formLocatario.telefone),
