@@ -2,14 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import AppHeader from '../components/AppHeader';
 import { fetchJson, requestJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVACAO' | 'CANCELADO';
 
-type Sala = { id: number; identificacao?: string; }; 
+type Sala = { id: number; identificacao?: string };
 
-type Locatario = { id: number; nome?: string; };
+type Locatario = { id: number; nome?: string };
 
 type Contrato = {
   id: number;
@@ -54,6 +55,7 @@ export default function ContratosPage() {
   const [locatarios, setLocatarios] = useState<Locatario[]>([]);
   const [formContrato, setFormContrato] = useState<ContratoForm>(defaultContratoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -113,6 +115,7 @@ export default function ContratosPage() {
       }
       setFormContrato(defaultContratoForm);
       setModoEdicao(false);
+      setShowModal(false);
       await carregarDados();
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao salvar contrato');
@@ -132,6 +135,7 @@ export default function ContratosPage() {
       observacoes: contrato.observacoes ?? ''
     });
     setModoEdicao(true);
+    setShowModal(true);
     setErro(null);
   };
 
@@ -147,23 +151,15 @@ export default function ContratosPage() {
   const resetForm = () => {
     setModoEdicao(false);
     setFormContrato(defaultContratoForm);
+    setShowModal(false);
     setErro(null);
   };
 
-  const voltarParaHome = () => {
-    router.push('/home');
-  };
-
-  const irParaTerrenos = () => {
-    router.push('/terrenos');
-  };
-
-  const irParaSalas = () => {
-    router.push('/salas');
-  };
-
-  const irParaLocatarios = () => {
-    router.push('/locatarios');
+  const abrirNovaFormulario = () => {
+    setModoEdicao(false);
+    setFormContrato(defaultContratoForm);
+    setShowModal(true);
+    setErro(null);
   };
 
   if (!isLoggedIn) {
@@ -172,157 +168,147 @@ export default function ContratosPage() {
 
   return (
     <main className='container'>
-      <header className='page-header'>
-        <div>
-          <h1 className='page-title'>Gestão de Aluguel - Contratos</h1>
-          <p className='page-subtitle'>Gerencie contratos, escolha sala, locatário e defina prazos e valores.</p>
-        </div>
-        <div className='button-group'>
-          <button type='button' className='button button-secondary' onClick={voltarParaHome}>
-            ← Voltar para Home
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaTerrenos}>
-            Ir para Terrenos
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaSalas}>
-            Ir para Salas
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaLocatarios}>
-            Ir para Locatários
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        title='Contratos'
+        subtitle='Gerencie contratos, escolha sala, locatário e defina prazos e valores.'
+      />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <div className='alert-card alert-error'>{erro}</div>}
 
-      <section className='card'>
-        <div className='page-header'>
-          <div>
-            <h2>{modoEdicao ? 'Editar contrato' : 'Novo contrato'}</h2>
-            <p className='page-subtitle'>Associe sala e locatário, defina datas e valores.</p>
-          </div>
-          <div className='button-group'>
-            <button type='button' className='button button-outline' onClick={resetForm}>
-              Limpar formulário
-            </button>
+      <div className='page-toolbar'>
+        <h2>Contratos cadastrados ({contratos.length})</h2>
+        <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
+          + Novo Contrato
+        </button>
+      </div>
+
+      {showModal && (
+        <div className='modal-backdrop' onClick={resetForm}>
+          <div className='modal' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h2>{modoEdicao ? 'Editar Contrato' : 'Novo Contrato'}</h2>
+                <p className='modal-description'>Associe sala e locatário, defina datas e valores.</p>
+              </div>
+              <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
+            </div>
+
+            <div className='modal-content'>
+              <form onSubmit={salvarContrato} className='form-grid'>
+                <div className='form-group'>
+                  <label>Sala <span className='required-star'>*</span></label>
+                  <select
+                    className='select-field'
+                    required
+                    value={formContrato.salaId}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, salaId: e.target.value }))}
+                  >
+                    <option value=''>Selecione uma sala</option>
+                    {salas.map((sala) => (
+                      <option key={sala.id} value={sala.id}>
+                        {sala.identificacao ?? `Sala #${sala.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label>Locatário <span className='required-star'>*</span></label>
+                  <select
+                    className='select-field'
+                    required
+                    value={formContrato.locatarioId}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, locatarioId: e.target.value }))}
+                  >
+                    <option value=''>Selecione um locatário</option>
+                    {locatarios.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.nome ?? `Locatário #${loc.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label>Data início <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='date'
+                    required
+                    value={formContrato.dataInicio}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, dataInicio: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Data término <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='date'
+                    required
+                    value={formContrato.dataTermino}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, dataTermino: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Valor aluguel <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='number'
+                    min='0'
+                    step='0.01'
+                    required
+                    value={formContrato.valorAluguel}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, valorAluguel: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Dia vencimento <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='number'
+                    min='1'
+                    max='31'
+                    required
+                    value={formContrato.diaVencimento}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, diaVencimento: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Status</label>
+                  <select
+                    className='select-field'
+                    value={formContrato.status}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, status: e.target.value as StatusContrato }))}
+                  >
+                    <option value='ATIVO'>Ativo</option>
+                    <option value='ENCERRADO'>Encerrado</option>
+                    <option value='RENOVACAO'>Renovação</option>
+                    <option value='CANCELADO'>Cancelado</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label>Observações</label>
+                  <textarea
+                    className='textarea-field'
+                    rows={4}
+                    value={formContrato.observacoes}
+                    onChange={(e) => setFormContrato((s) => ({ ...s, observacoes: e.target.value }))}
+                  />
+                </div>
+                <div className='form-actions'>
+                  <button type='submit' className='button button-primary'>
+                    {modoEdicao ? 'Atualizar contrato' : 'Criar contrato'}
+                  </button>
+                  <button type='button' className='button button-secondary' onClick={resetForm}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
-
-        <form onSubmit={salvarContrato} className='form-grid'>
-          <div className='form-group'>
-            <label>Sala <span className='required-star'>*</span></label>
-            <select
-              className='select-field'
-              required
-              value={formContrato.salaId}
-              onChange={(e) => setFormContrato((s) => ({ ...s, salaId: e.target.value }))}
-            >
-              <option value=''>Selecione uma sala</option>
-              {salas.map((sala) => (
-                <option key={sala.id} value={sala.id}>
-                  {sala.identificacao ?? `Sala #${sala.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className='form-group'>
-            <label>Locatário <span className='required-star'>*</span></label>
-            <select
-              className='select-field'
-              required
-              value={formContrato.locatarioId}
-              onChange={(e) => setFormContrato((s) => ({ ...s, locatarioId: e.target.value }))}
-            >
-              <option value=''>Selecione um locatário</option>
-              {locatarios.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.nome ?? `Locatário #${loc.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className='form-group'>
-            <label>Data início <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='date'
-              required
-              value={formContrato.dataInicio}
-              onChange={(e) => setFormContrato((s) => ({ ...s, dataInicio: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Data término <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='date'
-              required
-              value={formContrato.dataTermino}
-              onChange={(e) => setFormContrato((s) => ({ ...s, dataTermino: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Valor aluguel <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='number'
-              min='0'
-              step='0.01'
-              required
-              value={formContrato.valorAluguel}
-              onChange={(e) => setFormContrato((s) => ({ ...s, valorAluguel: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Dia vencimento <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='number'
-              min='1'
-              max='31'
-              required
-              value={formContrato.diaVencimento}
-              onChange={(e) => setFormContrato((s) => ({ ...s, diaVencimento: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Status</label>
-            <select
-              className='select-field'
-              value={formContrato.status}
-              onChange={(e) => setFormContrato((s) => ({ ...s, status: e.target.value as StatusContrato }))}
-            >
-              <option value='ATIVO'>Ativo</option>
-              <option value='ENCERRADO'>Encerrado</option>
-              <option value='RENOVACAO'>Renovação</option>
-              <option value='CANCELADO'>Cancelado</option>
-            </select>
-          </div>
-          <div className='form-group'>
-            <label>Observações</label>
-            <textarea
-              className='textarea-field'
-              rows={4}
-              value={formContrato.observacoes}
-              onChange={(e) => setFormContrato((s) => ({ ...s, observacoes: e.target.value }))}
-            />
-          </div>
-          <div className='form-actions'>
-            <button type='submit' className='button button-primary'>
-              {modoEdicao ? 'Atualizar contrato' : 'Criar contrato'}
-            </button>
-            {modoEdicao && (
-              <button type='button' className='button button-secondary' onClick={resetForm}>
-                Cancelar
-              </button>
-            )}
-          </div>
-        </form>
-      </section>
+      )}
 
       <section className='card'>
-        <h2>Contratos ({contratos.length})</h2>
         <table className='table'>
           <thead>
             <tr>

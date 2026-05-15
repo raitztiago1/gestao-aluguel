@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import AppHeader from '../components/AppHeader';
 import { fetchJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
@@ -106,28 +107,6 @@ export default function Home() {
     }
   };
 
-  const logout = () => {
-    clearSession();
-    setIsLoggedIn(false);
-    router.push('/login');
-  };
-
-  const irParaTerrenos = () => {
-    router.push('/terrenos');
-  };
-
-  const irParaSalas = () => {
-    router.push('/salas');
-  };
-
-  const irParaLocatarios = () => {
-    router.push('/locatarios');
-  };
-
-  const irParaContratos = () => {
-    router.push('/contratos');
-  };
-
   const abrirModal = (type: ModalType) => {
     setSelectedModal(type);
   };
@@ -178,29 +157,10 @@ export default function Home() {
 
   return (
     <main className='container'>
-      <header className='page-header'>
-        <div>
-          <h1 className='page-title'>Gestão de Aluguel</h1>
-          <p className='page-subtitle'>Painel administrativo com visão de contratos, vencimentos e cobrança.</p>
-        </div>
-        <div className='button-group'>
-          <button className='button button-primary' onClick={irParaTerrenos}>
-            Terrenos
-          </button>
-          <button className='button button-secondary' onClick={irParaSalas}>
-            Salas
-          </button>
-          <button className='button button-secondary' onClick={irParaLocatarios}>
-            Locatários
-          </button>
-          <button className='button button-secondary' onClick={irParaContratos}>
-            Contratos
-          </button>
-          <button className='button button-danger' onClick={logout}>
-            Sair
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        title='Painel'
+        subtitle='Visão geral dos terrenos, salas, contratos ativos e vencimentos de aluguel.'
+      />
 
       {carregando && <div className='alert-card'>Carregando dados...</div>}
       {erro && <div className='alert-card alert-error'>{erro}</div>}

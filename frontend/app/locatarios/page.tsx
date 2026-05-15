@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import AppHeader from '../components/AppHeader';
 import { fetchJson, requestJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
@@ -66,6 +67,7 @@ export default function LocatariosPage() {
   const [locatarios, setLocatarios] = useState<Locatario[]>([]);
   const [formLocatario, setFormLocatario] = useState<LocatarioForm>(defaultLocatarioForm);
   const [modoEdicao, setModoEdicao] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -125,6 +127,7 @@ export default function LocatariosPage() {
       }
       setFormLocatario(defaultLocatarioForm);
       setModoEdicao(false);
+      setShowModal(false);
       await carregarDados();
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao salvar locatário');
@@ -150,6 +153,7 @@ export default function LocatariosPage() {
       observacoes: locatario.observacoes ?? ''
     });
     setModoEdicao(true);
+    setShowModal(true);
     setErro(null);
   };
 
@@ -165,23 +169,15 @@ export default function LocatariosPage() {
   const resetForm = () => {
     setModoEdicao(false);
     setFormLocatario(defaultLocatarioForm);
+    setShowModal(false);
     setErro(null);
   };
 
-  const voltarParaHome = () => {
-    router.push('/home');
-  };
-
-  const irParaTerrenos = () => {
-    router.push('/terrenos');
-  };
-
-  const irParaSalas = () => {
-    router.push('/salas');
-  };
-
-  const irParaContratos = () => {
-    router.push('/contratos');
+  const abrirNovaFormulario = () => {
+    setModoEdicao(false);
+    setFormLocatario(defaultLocatarioForm);
+    setShowModal(true);
+    setErro(null);
   };
 
   if (!isLoggedIn) {
@@ -190,197 +186,187 @@ export default function LocatariosPage() {
 
   return (
     <main className='container'>
-      <header className='page-header'>
-        <div>
-          <h1 className='page-title'>Gestão de Aluguel - Locatários</h1>
-          <p className='page-subtitle'>Gerencie locatários com dados completos e navegação clara.</p>
-        </div>
-        <div className='button-group'>
-          <button type='button' className='button button-secondary' onClick={voltarParaHome}>
-            ← Voltar para Home
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaTerrenos}>
-            Ir para Terrenos
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaSalas}>
-            Ir para Salas
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaContratos}>
-            Ir para Contratos
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        title='Locatários'
+        subtitle='Gerencie locatários com dados completos e navegação clara.'
+      />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <div className='alert-card alert-error'>{erro}</div>}
 
-      <section className='card'>
-        <div className='page-header'>
-          <div>
-            <h2>{modoEdicao ? 'Editar locatário' : 'Novo locatário'}</h2>
-            <p className='page-subtitle'>Preencha os dados básicos para cadastrar ou atualizar o locatário.</p>
-          </div>
-          <div className='button-group'>
-            <button type='button' className='button button-outline' onClick={resetForm}>
-              Limpar formulário
-            </button>
+      <div className='page-toolbar'>
+        <h2>Locatários cadastrados ({locatarios.length})</h2>
+        <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
+          + Novo Locatário
+        </button>
+      </div>
+
+      {showModal && (
+        <div className='modal-backdrop' onClick={resetForm}>
+          <div className='modal' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h2>{modoEdicao ? 'Editar Locatário' : 'Novo Locatário'}</h2>
+                <p className='modal-description'>Preencha os dados básicos para cadastrar ou atualizar o locatário.</p>
+              </div>
+              <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
+            </div>
+
+            <div className='modal-content'>
+              <form onSubmit={salvarLocatario} className='form-grid'>
+                <div className='form-group'>
+                  <label>Tipo de pessoa</label>
+                  <select
+                    className='select-field'
+                    value={formLocatario.tipoPessoa}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, tipoPessoa: e.target.value as TipoPessoa }))}
+                    required
+                  >
+                    <option value='FISICA'>Física</option>
+                    <option value='JURIDICA'>Jurídica</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label>Nome <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    required
+                    value={formLocatario.nome}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>CPF/CNPJ <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    required
+                    value={formLocatario.cpfCnpj}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, cpfCnpj: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Email <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='email'
+                    required
+                    value={formLocatario.email}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Telefone <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='tel'
+                    required
+                    value={formLocatario.telefone}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, telefone: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Celular</label>
+                  <input
+                    className='input-field'
+                    type='tel'
+                    value={formLocatario.celular}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, celular: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Endereço <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    required
+                    value={formLocatario.endereco}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, endereco: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Número</label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    value={formLocatario.numero}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, numero: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Complemento</label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    value={formLocatario.complemento}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, complemento: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Bairro</label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    value={formLocatario.bairro}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, bairro: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Cidade <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    required
+                    value={formLocatario.cidade}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, cidade: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Estado <span className='required-star'>*</span></label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    maxLength={2}
+                    required
+                    value={formLocatario.estado}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, estado: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>CEP</label>
+                  <input
+                    className='input-field'
+                    type='text'
+                    value={formLocatario.cep}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, cep: e.target.value }))}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Observações</label>
+                  <textarea
+                    className='textarea-field'
+                    rows={4}
+                    value={formLocatario.observacoes}
+                    onChange={(e) => setFormLocatario((s) => ({ ...s, observacoes: e.target.value }))}
+                  />
+                </div>
+
+                <div className='form-actions'>
+                  <button type='submit' className='button button-primary'>
+                    {modoEdicao ? 'Atualizar locatário' : 'Criar locatário'}
+                  </button>
+                  <button type='button' className='button button-secondary' onClick={resetForm}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
-
-        <form onSubmit={salvarLocatario} className='form-grid'>
-          <div className='form-group'>
-            <label>Tipo de pessoa</label>
-            <select
-              className='select-field'
-              value={formLocatario.tipoPessoa}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, tipoPessoa: e.target.value as TipoPessoa }))}
-              required
-            >
-              <option value='FISICA'>Física</option>
-              <option value='JURIDICA'>Jurídica</option>
-            </select>
-          </div>
-          <div className='form-group'>
-            <label>Nome <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='text'
-              required
-              value={formLocatario.nome}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>CPF/CNPJ <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='text'
-              required
-              value={formLocatario.cpfCnpj}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, cpfCnpj: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Email <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='email'
-              required
-              value={formLocatario.email}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Telefone <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='tel'
-              required
-              value={formLocatario.telefone}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, telefone: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Celular</label>
-            <input
-              className='input-field'
-              type='tel'
-              value={formLocatario.celular}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, celular: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Endereço <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='text'
-              required
-              value={formLocatario.endereco}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, endereco: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Número</label>
-            <input
-              className='input-field'
-              type='text'
-              value={formLocatario.numero}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, numero: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Complemento</label>
-            <input
-              className='input-field'
-              type='text'
-              value={formLocatario.complemento}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, complemento: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Bairro</label>
-            <input
-              className='input-field'
-              type='text'
-              value={formLocatario.bairro}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, bairro: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Cidade <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='text'
-              required
-              value={formLocatario.cidade}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, cidade: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Estado <span className='required-star'>*</span></label>
-            <input
-              className='input-field'
-              type='text'
-              maxLength={2}
-              required
-              value={formLocatario.estado}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, estado: e.target.value.toUpperCase() }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>CEP</label>
-            <input
-              className='input-field'
-              type='text'
-              value={formLocatario.cep}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, cep: e.target.value }))}
-            />
-          </div>
-          <div className='form-group'>
-            <label>Observações</label>
-            <textarea
-              className='textarea-field'
-              rows={4}
-              value={formLocatario.observacoes}
-              onChange={(e) => setFormLocatario((s) => ({ ...s, observacoes: e.target.value }))}
-            />
-          </div>
-
-          <div className='form-actions'>
-            <button type='submit' className='button button-primary'>
-              {modoEdicao ? 'Atualizar locatário' : 'Criar locatário'}
-            </button>
-            {modoEdicao && (
-              <button type='button' className='button button-secondary' onClick={resetForm}>
-                Cancelar
-              </button>
-            )}
-          </div>
-        </form>
-      </section>
+      )}
 
       <section className='card'>
-        <h2>Locatários ({locatarios.length})</h2>
         <table className='table'>
           <thead>
             <tr>

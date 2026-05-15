@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import AppHeader from '../components/AppHeader';
 import { fetchJson, requestJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
@@ -148,50 +149,18 @@ export default function SalasPage() {
     setErro(null);
   };
 
-  const voltarParaHome = () => {
-    router.push('/home');
-  };
-
-  const irParaTerrenos = () => {
-    router.push('/terrenos');
-  };
-
-  const irParaLocatarios = () => {
-    router.push('/locatarios');
-  };
-
-  const irParaContratos = () => {
-    router.push('/contratos');
-  };
-
   if (!isLoggedIn) {
     return <div>Redirecionando para login...</div>;
   }
 
   return (
     <main className='container'>
-      <header className='page-header'>
-        <div>
-          <h1 className='page-title'>Gestão de Aluguel - Salas</h1>
-          <p className='page-subtitle'>Gerencie salas, vincule-as a terrenos, edite informações e exclua registros.</p>
-        </div>
-        <div className='button-group'>
-          <button type='button' className='button button-secondary' onClick={voltarParaHome}>
-            ← Voltar para Home
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaTerrenos}>
-            Ir para Terrenos
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaLocatarios}>
-            Ir para Locatários
-          </button>
-          <button type='button' className='button button-outline' onClick={irParaContratos}>
-            Ir para Contratos
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        title='Salas'
+        subtitle='Gerencie salas, vincule-as a terrenos, edite informações e exclua registros.'
+      />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div className='page-toolbar'>
         <h2>Salas cadastradas ({salas.length})</h2>
         <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
           + Nova Sala
