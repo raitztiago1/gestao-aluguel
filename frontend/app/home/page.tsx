@@ -2,7 +2,34 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { fetchJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
+
+type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
+
+type Terreno = {
+  id: number;
+  tipo?: string;
+  endereco?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  metragemTotal?: number;
+  quantidadeSalas?: number;
+  vagasGaragem?: number;
+};
+
+type Sala = {
+  id: number;
+  identificacao?: string;
+  metragem?: number;
+  status?: TipoSalaStatus;
+  terreno?: {
+    endereco?: string;
+    numero?: string;
+  };
+};
 
 type Contrato = {
   id: number;
@@ -16,6 +43,7 @@ type Contrato = {
     identificacao?: string;
     terreno?: {
       endereco?: string;
+      numero?: string;
     };
   };
   locatario?: {
@@ -23,20 +51,24 @@ type Contrato = {
   };
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
-const fetchJson = async <T,>(path: string): Promise<T[]> => {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`Erro: ${res.status}`);
-  return (await res.json()) as T[];
-};
+type ModalType = 'terrenos' | 'contratos' | 'salas' | null;
 
 export default function Home() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [terrenos, setTerrenos] = useState<Terreno[]>([]);
+  const [salas, setSalas] = useState<Sala[]>([]);
+  const [terrenosCount, setTerrenosCount] = useState(0);
+  const [salasDisponiveisCount, setSalasDisponiveisCount] = useState(0);
+  const [contratosAtivosCount, setContratosAtivosCount] = useState(0);
+  const [selectedModal, setSelectedModal] = useState<ModalType>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    document.title = 'Gestão de Aluguel - Home';
+  }, []);
 
   useEffect(() => {
     if (!isSessionValid()) {
@@ -46,19 +78,29 @@ export default function Home() {
     }
 
     setIsLoggedIn(true);
-    carregarContratos();
+    carregarDados();
     const cleanup = setupUnloadLogout();
     return cleanup;
   }, [router]);
 
-  const carregarContratos = async () => {
+  const carregarDados = async () => {
     try {
       setCarregando(true);
-      const contratosData = await fetchJson<Contrato>('/api/contratos');
+      const [contratosData, terrenosData, salasData] = await Promise.all([
+        fetchJson<Contrato>('/api/contratos'),
+        fetchJson<Terreno>('/api/terrenos'),
+        fetchJson<Sala>('/api/salas')
+      ]);
+
       setContratos(contratosData);
+      setTerrenos(terrenosData);
+      setSalas(salasData);
+      setTerrenosCount(terrenosData.length);
+      setSalasDisponiveisCount(salasData.filter((s) => s.status === 'DISPONIVEL').length);
+      setContratosAtivosCount(contratosData.filter((c) => c.status === 'ATIVO').length);
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar contratos');
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {
       setCarregando(false);
     }
@@ -70,8 +112,28 @@ export default function Home() {
     router.push('/login');
   };
 
-  const irParaCRUD = () => {
-    router.push('/crud');
+  const irParaTerrenos = () => {
+    router.push('/terrenos');
+  };
+
+  const irParaSalas = () => {
+    router.push('/salas');
+  };
+
+  const irParaLocatarios = () => {
+    router.push('/locatarios');
+  };
+
+  const irParaContratos = () => {
+    router.push('/contratos');
+  };
+
+  const abrirModal = (type: ModalType) => {
+    setSelectedModal(type);
+  };
+
+  const fecharModal = () => {
+    setSelectedModal(null);
   };
 
   const verificarAtraso = (contrato: Contrato) => {
@@ -122,8 +184,17 @@ export default function Home() {
           <p className='page-subtitle'>Painel administrativo com visão de contratos, vencimentos e cobrança.</p>
         </div>
         <div className='button-group'>
-          <button className='button button-primary' onClick={irParaCRUD}>
-            CRUD
+          <button className='button button-primary' onClick={irParaTerrenos}>
+            Terrenos
+          </button>
+          <button className='button button-secondary' onClick={irParaSalas}>
+            Salas
+          </button>
+          <button className='button button-secondary' onClick={irParaLocatarios}>
+            Locatários
+          </button>
+          <button className='button button-secondary' onClick={irParaContratos}>
+            Contratos
           </button>
           <button className='button button-danger' onClick={logout}>
             Sair
@@ -131,8 +202,161 @@ export default function Home() {
         </div>
       </header>
 
-      {carregando && <div className='alert-card'>Carregando contratos...</div>}
+      {carregando && <div className='alert-card'>Carregando dados...</div>}
       {erro && <div className='alert-card alert-error'>{erro}</div>}
+
+      <section className='summary-grid'>
+        <article className='summary-card'>
+          <p className='summary-label'>Terrenos cadastrados</p>
+          <strong className='summary-value'>{terrenosCount}</strong>
+          <button className='button button-link' onClick={() => abrirModal('terrenos')}>
+            Ver detalhes
+          </button>
+        </article>
+        <article className='summary-card'>
+          <p className='summary-label'>Contratos ativos</p>
+          <strong className='summary-value'>{contratosAtivosCount}</strong>
+          <button className='button button-link' onClick={() => abrirModal('contratos')}>
+            Ver detalhes
+          </button>
+        </article>
+        <article className='summary-card summary-card-highlight'>
+          <p className='summary-label'>Salas para alugar</p>
+          <strong className='summary-value'>{salasDisponiveisCount}</strong>
+          <button className='button button-link' onClick={() => abrirModal('salas')}>
+            Ver detalhes
+          </button>
+        </article>
+      </section>
+
+      {selectedModal && (
+        <div className='modal-backdrop' onClick={fecharModal}>
+          <div className='modal' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h2>
+                  {selectedModal === 'terrenos' && 'Terrenos cadastrados'}
+                  {selectedModal === 'contratos' && 'Contratos ativos'}
+                  {selectedModal === 'salas' && 'Salas para alugar'}
+                </h2>
+                <p className='modal-description'>Informações atualizadas direto do servidor.</p>
+              </div>
+              <button className='modal-close' onClick={fecharModal} aria-label='Fechar modal'>×</button>
+            </div>
+
+            <div className='modal-content'>
+              {selectedModal === 'terrenos' && (
+                <div className='modal-section'>
+                  <p className='summary-label'>Total de terrenos</p>
+                  <strong className='summary-value'>{terrenosCount}</strong>
+                  {terrenos.length === 0 ? (
+                    <p>Nenhum terreno encontrado.</p>
+                  ) : (
+                    <div className='table-scroll'>
+                      <table className='table'>
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Tipo</th>
+                            <th>Endereço</th>
+                            <th>Cidade</th>
+                            <th>Metragem</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {terrenos.map((terreno) => (
+                            <tr key={terreno.id}>
+                              <td>{terreno.id}</td>
+                              <td>{terreno.tipo || '—'}</td>
+                              <td>{terreno.endereco}{terreno.numero ? `, ${terreno.numero}` : ''}</td>
+                              <td>{terreno.cidade || '—'}</td>
+                              <td>{terreno.metragemTotal ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedModal === 'contratos' && (
+                <div className='modal-section'>
+                  <p className='summary-label'>Total de contratos carregados</p>
+                  <strong className='summary-value'>{contratos.length}</strong>
+                  {contratos.length === 0 ? (
+                    <p>Nenhum contrato encontrado.</p>
+                  ) : (
+                    <div className='table-scroll'>
+                      <table className='table'>
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Locatário</th>
+                            <th>Sala</th>
+                            <th>Endereço</th>
+                            <th>Valor</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {contratos.map((contrato) => (
+                            <tr key={contrato.id}>
+                              <td>{contrato.id}</td>
+                              <td>{contrato.locatario?.nome || '—'}</td>
+                              <td>{contrato.sala?.identificacao || '—'}</td>
+                              <td>{contrato.sala?.terreno?.endereco}{contrato.sala?.terreno?.numero ? `, ${contrato.sala.terreno.numero}` : ''}</td>
+                              <td>{contrato.valorAluguel != null ? `R$ ${contrato.valorAluguel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
+                              <td>{contrato.status || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedModal === 'salas' && (
+                <div className='modal-section'>
+                  <p className='summary-label'>Salas disponíveis</p>
+                  <strong className='summary-value'>{salasDisponiveisCount}</strong>
+                  {salas.filter((s) => s.status === 'DISPONIVEL').length === 0 ? (
+                    <p>Nenhuma sala disponível no momento.</p>
+                  ) : (
+                    <div className='table-scroll'>
+                      <table className='table'>
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Identificação</th>
+                            <th>Metragem</th>
+                            <th>Status</th>
+                            <th>Terreno</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {salas
+                            .filter((s) => s.status === 'DISPONIVEL')
+                            .map((sala) => (
+                              <tr key={sala.id}>
+                                <td>{sala.id}</td>
+                                <td>{sala.identificacao || '—'}</td>
+                                <td>{sala.metragem != null ? `${sala.metragem} m²` : '—'}</td>
+                                <td>{sala.status || '—'}</td>
+                                <td>{sala.terreno?.endereco}{sala.terreno?.numero ? `, ${sala.terreno.numero}` : ''}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {contratosEmAtraso.length > 0 && (
         <div className='alert-card alert-warning'>
@@ -141,7 +365,7 @@ export default function Home() {
           <ul>
             {contratosEmAtraso.map((contrato) => (
               <li key={contrato.id}>
-                <strong>Contrato #{contrato.id}</strong> - {contrato.locatario?.nome} - {contrato.sala?.identificacao} ({contrato.sala?.terreno?.endereco})
+                <strong>Contrato #{contrato.id}</strong> - {contrato.locatario?.nome} - {contrato.sala?.identificacao} ({contrato.sala?.terreno?.endereco}{contrato.sala?.terreno?.numero ? `, ${contrato.sala.terreno.numero}` : ''})
               </li>
             ))}
           </ul>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { fetchJson, requestJson } from '../lib/api';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
@@ -45,27 +46,6 @@ type TerrenoForm = {
   metragemCasa: string;
   observacoes: string;
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
-const fetchJson = async <T,>(path: string): Promise<T[]> => {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`Erro: ${res.status}`);
-  return (await res.json()) as T[];
-};
-
-async function requestJson<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
-  }
-  return (await res.json()) as T;
-}
 
 const defaultTerrenoForm: TerrenoForm = {
   tipo: 'RESIDENCIAL',
@@ -166,6 +146,10 @@ export default function CRUD() {
   };
 
   useEffect(() => {
+    document.title = 'Gestão de Aluguel - Terrenos';
+  }, []);
+
+  useEffect(() => {
     if (!isSessionValid()) {
       clearSession();
       router.push('/login');
@@ -240,11 +224,7 @@ export default function CRUD() {
 
   const excluirTerreno = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/terrenos/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status} ${res.statusText}: ${text}`);
-      }
+      await requestJson<void>(`/api/terrenos/${id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Falha ao excluir terreno');
@@ -261,6 +241,18 @@ export default function CRUD() {
     router.push('/home');
   };
 
+  const irParaSalas = () => {
+    router.push('/salas');
+  };
+
+  const irParaLocatarios = () => {
+    router.push('/locatarios');
+  };
+
+  const irParaContratos = () => {
+    router.push('/contratos');
+  };
+
   if (!isLoggedIn) {
     return <div>Redirecionando para login...</div>;
   }
@@ -270,16 +262,23 @@ export default function CRUD() {
       <header className='page-header'>
         <div>
           <h1 className='page-title'>Gestão de Aluguel - Terrenos</h1>
-          <p className='page-subtitle'>Cadastro e visualização rápida de terrenos, salas, locatários e contratos.</p>
+          <p className='page-subtitle'>Cadastro e visualização rápida de terrenos.</p>
         </div>
         <div className='button-group'>
           <button type='button' className='button button-secondary' onClick={voltarParaHome}>
             ← Voltar para Home
           </button>
+          <button type='button' className='button button-outline' onClick={irParaSalas}>
+            Ir para Salas
+          </button>
+          <button type='button' className='button button-outline' onClick={irParaLocatarios}>
+            Ir para Locatários
+          </button>
+          <button type='button' className='button button-outline' onClick={irParaContratos}>
+            Ir para Contratos
+          </button>
         </div>
       </header>
-
-      <p className='small-text'>API base: {API_BASE}</p>
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <div className='alert-card alert-error'>{erro}</div>}
@@ -498,7 +497,7 @@ export default function CRUD() {
               <tr key={terreno.id}>
                 <td>{terreno.id}</td>
                 <td>{terreno.tipo}</td>
-                <td>{terreno.endereco}</td>
+                <td>{terreno.endereco}{terreno.numero ? `, ${terreno.numero}` : ''}</td>
                 <td>{terreno.cidade}</td>
                 <td>{terreno.estado}</td>
                 <td>{terreno.metragemTotal}</td>
@@ -515,80 +514,6 @@ export default function CRUD() {
                     Excluir
                   </button>
                 </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className='card'>
-        <h2>Salas ({salas.length})</h2>
-        <table className='table'>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Identificação</th>
-              <th>Metragem</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {salas.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.identificacao || '—'}</td>
-                <td>{item.metragem ?? '—'}</td>
-                <td>{item.status || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className='card'>
-        <h2>Locatários ({locatarios.length})</h2>
-        <table className='table'>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nome</th>
-              <th>Email</th>
-              <th>Telefone</th>
-            </tr>
-          </thead>
-          <tbody>
-            {locatarios.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.nome}</td>
-                <td>{item.email}</td>
-                <td>{item.telefone || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className='card'>
-        <h2>Contratos ({contratos.length})</h2>
-        <table className='table'>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Valor</th>
-              <th>Início</th>
-              <th>Fim</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contratos.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.valorAluguel ?? '—'}</td>
-                <td>{item.dataInicio || '—'}</td>
-                <td>{item.dataTermino || '—'}</td>
-                <td>{item.status || '—'}</td>
               </tr>
             ))}
           </tbody>
