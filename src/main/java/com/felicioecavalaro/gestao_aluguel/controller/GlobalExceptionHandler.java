@@ -84,4 +84,16 @@ public class GlobalExceptionHandler {
         body.put("path", request.getDescription(false).replace("uri=", ""));
         return body;
     }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Map<String, Object> handleGeneric(Exception ex, WebRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Erro interno do servidor");
+        body.put("message", "Ocorreu um erro inesperado. Tente novamente em instantes.");
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        return body;
+    }
 }

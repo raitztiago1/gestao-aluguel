@@ -3,7 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
+import ErrorAlert from '../components/ErrorAlert';
+import StatusBadge from '../components/StatusBadge';
 import { fetchJson } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import {
+  formatAddressLine,
+  formatArea,
+  formatCurrency,
+  labelStatusContrato,
+  labelTipoTerreno
+} from '../lib/format';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
@@ -17,8 +27,6 @@ type Terreno = {
   cidade?: string;
   estado?: string;
   metragemTotal?: number;
-  quantidadeSalas?: number;
-  vagasGaragem?: number;
 };
 
 type Sala = {
@@ -26,10 +34,7 @@ type Sala = {
   identificacao?: string;
   metragem?: number;
   status?: TipoSalaStatus;
-  terreno?: {
-    endereco?: string;
-    numero?: string;
-  };
+  terreno?: { endereco?: string; numero?: string };
 };
 
 type Contrato = {
@@ -40,16 +45,10 @@ type Contrato = {
   status?: string;
   diaVencimento?: number;
   sala?: {
-    id: number;
     identificacao?: string;
-    terreno?: {
-      endereco?: string;
-      numero?: string;
-    };
+    terreno?: { endereco?: string; numero?: string };
   };
-  locatario?: {
-    nome?: string;
-  };
+  locatario?: { nome?: string };
 };
 
 type ModalType = 'terrenos' | 'contratos' | 'salas' | null;
@@ -77,11 +76,9 @@ export default function Home() {
       router.push('/login');
       return;
     }
-
     setIsLoggedIn(true);
     carregarDados();
-    const cleanup = setupUnloadLogout();
-    return cleanup;
+    return setupUnloadLogout();
   }, [router]);
 
   const carregarDados = async () => {
@@ -92,7 +89,6 @@ export default function Home() {
         fetchJson<Terreno>('/api/terrenos'),
         fetchJson<Sala>('/api/salas')
       ]);
-
       setContratos(contratosData);
       setTerrenos(terrenosData);
       setSalas(salasData);
@@ -101,35 +97,21 @@ export default function Home() {
       setContratosAtivosCount(contratosData.filter((c) => c.status === 'ATIVO').length);
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      setErro(getErrorMessage(err, 'Erro ao carregar dados do painel.'));
     } finally {
       setCarregando(false);
     }
   };
 
-  const abrirModal = (type: ModalType) => {
-    setSelectedModal(type);
-  };
-
-  const fecharModal = () => {
-    setSelectedModal(null);
-  };
-
   const verificarAtraso = (contrato: Contrato) => {
     if (!contrato.diaVencimento || !contrato.dataInicio) return false;
-
     const hoje = new Date();
     const diaAtual = hoje.getDate();
     const mesAtual = hoje.getMonth();
     const anoAtual = hoje.getFullYear();
-
     const dataInicio = new Date(contrato.dataInicio);
-    const mesInicio = dataInicio.getMonth();
-    const anoInicio = dataInicio.getFullYear();
-
-    let mesVencimento = mesInicio;
-    let anoVencimento = anoInicio;
-
+    let mesVencimento = dataInicio.getMonth();
+    let anoVencimento = dataInicio.getFullYear();
     if (diaAtual > contrato.diaVencimento) {
       mesVencimento = mesAtual + 1;
       anoVencimento = anoAtual;
@@ -141,18 +123,17 @@ export default function Home() {
       mesVencimento = mesAtual;
       anoVencimento = anoAtual;
     }
-
     const dataVencimento = new Date(anoVencimento, mesVencimento, contrato.diaVencimento);
-    const diffTime = hoje.getTime() - dataVencimento.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+    const diffDays = Math.ceil((hoje.getTime() - dataVencimento.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays > 0;
   };
 
   const contratosEmAtraso = contratos.filter(verificarAtraso);
+  const contratosAtivos = contratos.filter((c) => c.status === 'ATIVO');
+  const salasDisponiveis = salas.filter((s) => s.status === 'DISPONIVEL');
 
   if (!isLoggedIn) {
-    return <div>Redirecionando para login...</div>;
+    return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
   return (
@@ -163,34 +144,34 @@ export default function Home() {
       />
 
       {carregando && <div className='alert-card'>Carregando dados...</div>}
-      {erro && <div className='alert-card alert-error'>{erro}</div>}
+      {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       <section className='summary-grid'>
         <article className='summary-card'>
           <p className='summary-label'>Terrenos cadastrados</p>
           <strong className='summary-value'>{terrenosCount}</strong>
-          <button className='button button-link' onClick={() => abrirModal('terrenos')}>
+          <button className='button button-link' onClick={() => setSelectedModal('terrenos')}>
             Ver detalhes
           </button>
         </article>
         <article className='summary-card'>
           <p className='summary-label'>Contratos ativos</p>
           <strong className='summary-value'>{contratosAtivosCount}</strong>
-          <button className='button button-link' onClick={() => abrirModal('contratos')}>
+          <button className='button button-link' onClick={() => setSelectedModal('contratos')}>
             Ver detalhes
           </button>
         </article>
         <article className='summary-card summary-card-highlight'>
           <p className='summary-label'>Salas para alugar</p>
           <strong className='summary-value'>{salasDisponiveisCount}</strong>
-          <button className='button button-link' onClick={() => abrirModal('salas')}>
+          <button className='button button-link' onClick={() => setSelectedModal('salas')}>
             Ver detalhes
           </button>
         </article>
       </section>
 
       {selectedModal && (
-        <div className='modal-backdrop' onClick={fecharModal}>
+        <div className='modal-backdrop' onClick={() => setSelectedModal(null)}>
           <div className='modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
@@ -199,16 +180,16 @@ export default function Home() {
                   {selectedModal === 'contratos' && 'Contratos ativos'}
                   {selectedModal === 'salas' && 'Salas para alugar'}
                 </h2>
-                <p className='modal-description'>Informações atualizadas direto do servidor.</p>
+                <p className='modal-description'>Resumo atualizado do seu portfólio.</p>
               </div>
-              <button className='modal-close' onClick={fecharModal} aria-label='Fechar modal'>×</button>
+              <button className='modal-close' onClick={() => setSelectedModal(null)} aria-label='Fechar modal'>
+                ×
+              </button>
             </div>
 
             <div className='modal-content'>
               {selectedModal === 'terrenos' && (
                 <div className='modal-section'>
-                  <p className='summary-label'>Total de terrenos</p>
-                  <strong className='summary-value'>{terrenosCount}</strong>
                   {terrenos.length === 0 ? (
                     <p>Nenhum terreno encontrado.</p>
                   ) : (
@@ -216,7 +197,6 @@ export default function Home() {
                       <table className='table'>
                         <thead>
                           <tr>
-                            <th>ID</th>
                             <th>Tipo</th>
                             <th>Endereço</th>
                             <th>Cidade</th>
@@ -226,11 +206,10 @@ export default function Home() {
                         <tbody>
                           {terrenos.map((terreno) => (
                             <tr key={terreno.id}>
-                              <td>{terreno.id}</td>
-                              <td>{terreno.tipo || '—'}</td>
-                              <td>{terreno.endereco}{terreno.numero ? `, ${terreno.numero}` : ''}</td>
+                              <td>{labelTipoTerreno(terreno.tipo)}</td>
+                              <td>{formatAddressLine(terreno)}</td>
                               <td>{terreno.cidade || '—'}</td>
-                              <td>{terreno.metragemTotal ?? '—'}</td>
+                              <td>{formatArea(terreno.metragemTotal)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -242,16 +221,13 @@ export default function Home() {
 
               {selectedModal === 'contratos' && (
                 <div className='modal-section'>
-                  <p className='summary-label'>Total de contratos carregados</p>
-                  <strong className='summary-value'>{contratos.length}</strong>
-                  {contratos.length === 0 ? (
-                    <p>Nenhum contrato encontrado.</p>
+                  {contratosAtivos.length === 0 ? (
+                    <p>Nenhum contrato ativo no momento.</p>
                   ) : (
                     <div className='table-scroll'>
                       <table className='table'>
                         <thead>
                           <tr>
-                            <th>ID</th>
                             <th>Locatário</th>
                             <th>Sala</th>
                             <th>Endereço</th>
@@ -260,14 +236,19 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody>
-                          {contratos.map((contrato) => (
+                          {contratosAtivos.map((contrato) => (
                             <tr key={contrato.id}>
-                              <td>{contrato.id}</td>
                               <td>{contrato.locatario?.nome || '—'}</td>
                               <td>{contrato.sala?.identificacao || '—'}</td>
-                              <td>{contrato.sala?.terreno?.endereco}{contrato.sala?.terreno?.numero ? `, ${contrato.sala.terreno.numero}` : ''}</td>
-                              <td>{contrato.valorAluguel != null ? `R$ ${contrato.valorAluguel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
-                              <td>{contrato.status || '—'}</td>
+                              <td>
+                                {contrato.sala?.terreno
+                                  ? formatAddressLine(contrato.sala.terreno)
+                                  : '—'}
+                              </td>
+                              <td>{formatCurrency(contrato.valorAluguel)}</td>
+                              <td>
+                                <StatusBadge kind='contrato' status={contrato.status} />
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -279,34 +260,26 @@ export default function Home() {
 
               {selectedModal === 'salas' && (
                 <div className='modal-section'>
-                  <p className='summary-label'>Salas disponíveis</p>
-                  <strong className='summary-value'>{salasDisponiveisCount}</strong>
-                  {salas.filter((s) => s.status === 'DISPONIVEL').length === 0 ? (
+                  {salasDisponiveis.length === 0 ? (
                     <p>Nenhuma sala disponível no momento.</p>
                   ) : (
                     <div className='table-scroll'>
                       <table className='table'>
                         <thead>
                           <tr>
-                            <th>ID</th>
-                            <th>Identificação</th>
+                            <th>Sala</th>
                             <th>Metragem</th>
-                            <th>Status</th>
                             <th>Terreno</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {salas
-                            .filter((s) => s.status === 'DISPONIVEL')
-                            .map((sala) => (
-                              <tr key={sala.id}>
-                                <td>{sala.id}</td>
-                                <td>{sala.identificacao || '—'}</td>
-                                <td>{sala.metragem != null ? `${sala.metragem} m²` : '—'}</td>
-                                <td>{sala.status || '—'}</td>
-                                <td>{sala.terreno?.endereco}{sala.terreno?.numero ? `, ${sala.terreno.numero}` : ''}</td>
-                              </tr>
-                            ))}
+                          {salasDisponiveis.map((sala) => (
+                            <tr key={sala.id}>
+                              <td>{sala.identificacao || '—'}</td>
+                              <td>{formatArea(sala.metragem)}</td>
+                              <td>{sala.terreno ? formatAddressLine(sala.terreno) : '—'}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -320,12 +293,13 @@ export default function Home() {
 
       {contratosEmAtraso.length > 0 && (
         <div className='alert-card alert-warning'>
-          <h3>⚠️ ALERTA: Contratos em Atraso</h3>
-          <p>Existem {contratosEmAtraso.length} contrato(s) com pagamento(s) em atraso.</p>
+          <h3>Contratos em atraso</h3>
+          <p>Existem {contratosEmAtraso.length} contrato(s) com pagamento em atraso.</p>
           <ul>
             {contratosEmAtraso.map((contrato) => (
               <li key={contrato.id}>
-                <strong>Contrato #{contrato.id}</strong> - {contrato.locatario?.nome} - {contrato.sala?.identificacao} ({contrato.sala?.terreno?.endereco}{contrato.sala?.terreno?.numero ? `, ${contrato.sala.terreno.numero}` : ''})
+                <strong>{contrato.locatario?.nome || 'Locatário'}</strong> — {contrato.sala?.identificacao || 'Sala'}{' '}
+                ({contrato.sala?.terreno ? formatAddressLine(contrato.sala.terreno) : 'endereço não informado'})
               </li>
             ))}
           </ul>
@@ -333,40 +307,46 @@ export default function Home() {
       )}
 
       <section className='card'>
-        <h2>Vencimentos dos Aluguéis ({contratos.length})</h2>
+        <h2>Vencimentos dos aluguéis ({contratos.length})</h2>
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Locatário</th>
               <th>Sala</th>
               <th>Endereço</th>
               <th>Valor</th>
-              <th>Dia Vencimento</th>
+              <th>Vencimento</th>
               <th>Status</th>
               <th>Situação</th>
             </tr>
           </thead>
           <tbody>
-            {contratos.map((contrato) => {
-              const emAtraso = verificarAtraso(contrato);
-              return (
-                <tr key={contrato.id}>
-                  <td>{contrato.id}</td>
-                  <td>{contrato.locatario?.nome || '—'}</td>
-                  <td>{contrato.sala?.identificacao || '—'}</td>
-                  <td>{contrato.sala?.terreno?.endereco || '—'}</td>
-                  <td>R$ {contrato.valorAluguel?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '—'}</td>
-                  <td>{contrato.diaVencimento || '—'}</td>
-                  <td>{contrato.status || '—'}</td>
-                  <td>
-                    <span className={emAtraso ? 'badge badge-danger' : 'badge badge-success'}>
-                      {emAtraso ? 'Em atraso' : 'Em dia'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+            {contratos.length === 0 ? (
+              <tr>
+                <td colSpan={7} className='table-empty'>
+                  Nenhum contrato cadastrado.
+                </td>
+              </tr>
+            ) : (
+              contratos.map((contrato) => {
+                const emAtraso = verificarAtraso(contrato);
+                return (
+                  <tr key={contrato.id}>
+                    <td>{contrato.locatario?.nome || '—'}</td>
+                    <td>{contrato.sala?.identificacao || '—'}</td>
+                    <td>{contrato.sala?.terreno ? formatAddressLine(contrato.sala.terreno) : '—'}</td>
+                    <td>{formatCurrency(contrato.valorAluguel)}</td>
+                    <td>Dia {contrato.diaVencimento ?? '—'}</td>
+                    <td>{labelStatusContrato(contrato.status)}</td>
+                    <td>
+                      <span className={emAtraso ? 'badge badge-danger' : 'badge badge-success'}>
+                        {emAtraso ? 'Em atraso' : 'Em dia'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </section>

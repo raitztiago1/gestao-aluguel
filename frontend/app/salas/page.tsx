@@ -3,15 +3,23 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
+import ErrorAlert from '../components/ErrorAlert';
+import MaskedInput from '../components/MaskedInput';
+import StatusBadge from '../components/StatusBadge';
 import { fetchJson, requestJson } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import { formatAddressLine, formatArea, formatTerrenoOption } from '../lib/format';
+import { maskArea, parseArea } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
 
 type Terreno = {
   id: number;
+  tipo?: string;
   endereco?: string;
   numero?: string;
+  bairro?: string;
   cidade?: string;
   estado?: string;
 };
@@ -65,8 +73,7 @@ export default function SalasPage() {
     }
     setIsLoggedIn(true);
     carregarDados();
-    const cleanup = setupUnloadLogout();
-    return cleanup;
+    return setupUnloadLogout();
   }, [router]);
 
   const carregarDados = async () => {
@@ -80,7 +87,7 @@ export default function SalasPage() {
       setTerrenos(loadedTerrenos);
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      setErro(getErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
       setCarregando(false);
     }
@@ -90,10 +97,10 @@ export default function SalasPage() {
     event.preventDefault();
     try {
       const payload = {
-        identificacao: formSala.identificacao,
-        metragem: Number(formSala.metragem),
+        identificacao: formSala.identificacao.trim(),
+        metragem: parseArea(formSala.metragem),
         status: formSala.status,
-        observacoes: formSala.observacoes || undefined,
+        observacoes: formSala.observacoes.trim() || undefined,
         terreno: { id: Number(formSala.terrenoId) }
       };
 
@@ -103,12 +110,10 @@ export default function SalasPage() {
         await requestJson<Sala>('/api/salas', 'POST', payload);
       }
 
-      setFormSala(defaultSalaForm);
-      setModoEdicao(false);
-      setShowModal(false);
+      resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao salvar sala');
+      setErro(getErrorMessage(err, 'Falha ao salvar sala.'));
     }
   };
 
@@ -116,8 +121,8 @@ export default function SalasPage() {
     setFormSala({
       id: sala.id,
       identificacao: sala.identificacao,
-      metragem: sala.metragem?.toString() ?? '',
-      status: (sala.status ?? 'DISPONIVEL') as TipoSalaStatus,
+      metragem: String(sala.metragem).replace('.', ','),
+      status: sala.status ?? 'DISPONIVEL',
       terrenoId: sala.terreno?.id?.toString() ?? '',
       observacoes: sala.observacoes ?? ''
     });
@@ -127,11 +132,12 @@ export default function SalasPage() {
   };
 
   const excluirSala = async (id: number) => {
+    if (!window.confirm('Deseja realmente excluir esta sala?')) return;
     try {
       await requestJson<void>(`/api/salas/${id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao excluir sala');
+      setErro(getErrorMessage(err, 'Falha ao excluir sala.'));
     }
   };
 
@@ -142,41 +148,38 @@ export default function SalasPage() {
     setErro(null);
   };
 
-  const abrirNovaFormulario = () => {
-    setModoEdicao(false);
-    setFormSala(defaultSalaForm);
-    setShowModal(true);
-    setErro(null);
-  };
-
   if (!isLoggedIn) {
-    return <div>Redirecionando para login...</div>;
+    return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
   return (
     <main className='container'>
-      <AppHeader
-        title='Salas'
-        subtitle='Gerencie salas, vincule-as a terrenos, edite informações e exclua registros.'
-      />
+      <AppHeader title='Salas' subtitle='Cadastre salas e vincule-as aos terrenos.' />
 
       <div className='page-toolbar'>
         <h2>Salas cadastradas ({salas.length})</h2>
-        <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
-          + Nova Sala
+        <button
+          type='button'
+          className='button button-primary'
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+        >
+          + Nova sala
         </button>
       </div>
 
       {carregando && <div className='alert-card'>Carregando...</div>}
-      {erro && <div className='alert-card alert-error'>{erro}</div>}
+      {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       {showModal && (
         <div className='modal-backdrop' onClick={resetForm}>
           <div className='modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h2>{modoEdicao ? 'Editar Sala' : 'Nova Sala'}</h2>
-                <p className='modal-description'>Informe a identificação, metragem, status e o terreno vinculado.</p>
+                <h2>{modoEdicao ? 'Editar sala' : 'Nova sala'}</h2>
+                <p className='modal-description'>Informe identificação, metragem, status e terreno.</p>
               </div>
               <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
             </div>
@@ -191,10 +194,10 @@ export default function SalasPage() {
                     value={formSala.terrenoId}
                     onChange={(e) => setFormSala((s) => ({ ...s, terrenoId: e.target.value }))}
                   >
-                    <option value=''>Selecione um terreno</option>
+                    <option value=''>Selecione o terreno</option>
                     {terrenos.map((terreno) => (
                       <option key={terreno.id} value={terreno.id}>
-                        {terreno.endereco ? `${terreno.endereco}${terreno.numero ? `, ${terreno.numero}` : ''} — ${terreno.cidade ?? ''}/${terreno.estado ?? ''}` : `Terreno #${terreno.id}`}
+                        {formatTerrenoOption(terreno)}
                       </option>
                     ))}
                   </select>
@@ -206,6 +209,7 @@ export default function SalasPage() {
                     className='input-field'
                     type='text'
                     required
+                    placeholder='Ex.: Sala 101, Bloco A'
                     value={formSala.identificacao}
                     onChange={(e) => setFormSala((s) => ({ ...s, identificacao: e.target.value }))}
                   />
@@ -213,14 +217,13 @@ export default function SalasPage() {
 
                 <div className='form-group'>
                   <label>Metragem (m²) <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='number'
-                    min='0'
-                    step='0.01'
+                  <MaskedInput
+                    mask='area'
                     required
                     value={formSala.metragem}
-                    onChange={(e) => setFormSala((s) => ({ ...s, metragem: e.target.value }))}
+                    onValueChange={(metragem) => setFormSala((s) => ({ ...s, metragem }))}
+                    placeholder='Ex.: 45,00'
+                    inputMode='decimal'
                   />
                 </div>
 
@@ -249,7 +252,7 @@ export default function SalasPage() {
 
                 <div className='form-actions'>
                   <button type='submit' className='button button-primary'>
-                    {modoEdicao ? 'Atualizar sala' : 'Criar sala'}
+                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar sala'}
                   </button>
                   <button type='button' className='button button-secondary' onClick={resetForm}>
                     Cancelar
@@ -265,7 +268,7 @@ export default function SalasPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>Identificação</th>
+              <th>Sala</th>
               <th>Terreno</th>
               <th>Metragem</th>
               <th>Status</th>
@@ -273,22 +276,32 @@ export default function SalasPage() {
             </tr>
           </thead>
           <tbody>
-            {salas.map((sala) => (
-              <tr key={sala.id}>
-                <td>{sala.identificacao}</td>
-                <td>{sala.terreno ? (sala.terreno.endereco ? `${sala.terreno.endereco}${sala.terreno.numero ? `, ${sala.terreno.numero}` : ''}` : `#${sala.terreno.id}`) : '—'}</td>
-                <td>{sala.metragem} m²</td>
-                <td>{sala.status ?? '—'}</td>
-                <td className='table-actions'>
-                  <button type='button' className='button button-outline' onClick={() => editarSala(sala)}>
-                    Editar
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={() => excluirSala(sala.id)}>
-                    Excluir
-                  </button>
+            {salas.length === 0 ? (
+              <tr>
+                <td colSpan={5} className='table-empty'>
+                  Nenhuma sala cadastrada.
                 </td>
               </tr>
-            ))}
+            ) : (
+              salas.map((sala) => (
+                <tr key={sala.id}>
+                  <td>{sala.identificacao}</td>
+                  <td>{sala.terreno ? formatAddressLine(sala.terreno) : '—'}</td>
+                  <td>{formatArea(sala.metragem)}</td>
+                  <td>
+                    <StatusBadge kind='sala' status={sala.status} />
+                  </td>
+                  <td className='table-actions'>
+                    <button type='button' className='button button-outline' onClick={() => editarSala(sala)}>
+                      Editar
+                    </button>
+                    <button type='button' className='button button-secondary' onClick={() => excluirSala(sala.id)}>
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>

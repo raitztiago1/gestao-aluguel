@@ -1,9 +1,21 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
+import ErrorAlert from '../components/ErrorAlert';
+import MaskedInput from '../components/MaskedInput';
 import { fetchJson, requestJson } from '../lib/api';
+import {
+  formatAddressLine,
+  formatCpfCnpjDisplay,
+  formatPhoneDisplay,
+  labelTipoPessoa
+} from '../lib/format';
+import { getErrorMessage } from '../lib/errors';
+import { useCepLookup } from '../hooks/useCepLookup';
+import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoPessoa = 'FISICA' | 'JURIDICA';
@@ -61,6 +73,26 @@ const defaultLocatarioForm: LocatarioForm = {
   observacoes: ''
 };
 
+function locatarioToForm(loc: Locatario): LocatarioForm {
+  return {
+    id: loc.id,
+    tipoPessoa: loc.tipoPessoa,
+    nome: loc.nome,
+    cpfCnpj: maskCpfCnpj(loc.cpfCnpj, loc.tipoPessoa),
+    email: loc.email,
+    telefone: maskPhone(loc.telefone),
+    celular: loc.celular ? maskPhone(loc.celular) : '',
+    endereco: loc.endereco,
+    numero: loc.numero ?? '',
+    complemento: loc.complemento ?? '',
+    bairro: loc.bairro ?? '',
+    cidade: loc.cidade,
+    estado: loc.estado,
+    cep: loc.cep ? maskCep(loc.cep) : '',
+    observacoes: loc.observacoes ?? ''
+  };
+}
+
 export default function LocatariosPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -70,6 +102,15 @@ export default function LocatariosPage() {
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+
+  const updateAddress = useCallback((patch: Partial<LocatarioForm>) => {
+    setFormLocatario((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const { handleCepChange, resetCepRef } = useCepLookup({
+    onAddressUpdate: updateAddress,
+    onError: (msg) => setErro(msg)
+  });
 
   useEffect(() => {
     document.title = 'Gestão de Aluguel - Locatários';
@@ -94,7 +135,7 @@ export default function LocatariosPage() {
       setLocatarios(loaded);
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar locatários');
+      setErro(getErrorMessage(err, 'Erro ao carregar locatários.'));
     } finally {
       setCarregando(false);
     }
@@ -105,19 +146,19 @@ export default function LocatariosPage() {
     try {
       const payload = {
         tipoPessoa: formLocatario.tipoPessoa,
-        nome: formLocatario.nome,
-        cpfCnpj: formLocatario.cpfCnpj,
-        email: formLocatario.email,
-        telefone: formLocatario.telefone,
-        celular: formLocatario.celular || undefined,
-        endereco: formLocatario.endereco,
-        numero: formLocatario.numero || undefined,
-        complemento: formLocatario.complemento || undefined,
-        bairro: formLocatario.bairro || undefined,
-        cidade: formLocatario.cidade,
+        nome: formLocatario.nome.trim(),
+        cpfCnpj: onlyDigits(formLocatario.cpfCnpj),
+        email: formLocatario.email.trim(),
+        telefone: onlyDigits(formLocatario.telefone),
+        celular: formLocatario.celular ? onlyDigits(formLocatario.celular) : undefined,
+        endereco: formLocatario.endereco.trim(),
+        numero: formLocatario.numero.trim() || undefined,
+        complemento: formLocatario.complemento.trim() || undefined,
+        bairro: formLocatario.bairro.trim() || undefined,
+        cidade: formLocatario.cidade.trim(),
         estado: formLocatario.estado,
-        cep: formLocatario.cep || undefined,
-        observacoes: formLocatario.observacoes || undefined
+        cep: formLocatario.cep ? onlyDigits(formLocatario.cep) : undefined,
+        observacoes: formLocatario.observacoes.trim() || undefined
       };
 
       if (modoEdicao && formLocatario.id) {
@@ -125,44 +166,28 @@ export default function LocatariosPage() {
       } else {
         await requestJson<Locatario>('/api/locatarios', 'POST', payload);
       }
-      setFormLocatario(defaultLocatarioForm);
-      setModoEdicao(false);
-      setShowModal(false);
+      resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao salvar locatário');
+      setErro(getErrorMessage(err, 'Falha ao salvar locatário.'));
     }
   };
 
   const editarLocatario = (locatario: Locatario) => {
-    setFormLocatario({
-      id: locatario.id,
-      tipoPessoa: locatario.tipoPessoa,
-      nome: locatario.nome,
-      cpfCnpj: locatario.cpfCnpj,
-      email: locatario.email,
-      telefone: locatario.telefone,
-      celular: locatario.celular ?? '',
-      endereco: locatario.endereco,
-      numero: locatario.numero ?? '',
-      complemento: locatario.complemento ?? '',
-      bairro: locatario.bairro ?? '',
-      cidade: locatario.cidade,
-      estado: locatario.estado,
-      cep: locatario.cep ?? '',
-      observacoes: locatario.observacoes ?? ''
-    });
+    setFormLocatario(locatarioToForm(locatario));
     setModoEdicao(true);
     setShowModal(true);
     setErro(null);
+    resetCepRef();
   };
 
   const excluirLocatario = async (id: number) => {
+    if (!window.confirm('Deseja realmente excluir este locatário?')) return;
     try {
       await requestJson<void>(`/api/locatarios/${id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao excluir locatário');
+      setErro(getErrorMessage(err, 'Falha ao excluir locatário.'));
     }
   };
 
@@ -171,6 +196,7 @@ export default function LocatariosPage() {
     setFormLocatario(defaultLocatarioForm);
     setShowModal(false);
     setErro(null);
+    resetCepRef();
   };
 
   const abrirNovaFormulario = () => {
@@ -178,26 +204,27 @@ export default function LocatariosPage() {
     setFormLocatario(defaultLocatarioForm);
     setShowModal(true);
     setErro(null);
+    resetCepRef();
   };
 
   if (!isLoggedIn) {
-    return <div>Redirecionando para login...</div>;
+    return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
   return (
     <main className='container'>
       <AppHeader
         title='Locatários'
-        subtitle='Gerencie locatários com dados completos e navegação clara.'
+        subtitle='Cadastre pessoas físicas ou jurídicas com contato e endereço completos.'
       />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
-      {erro && <div className='alert-card alert-error'>{erro}</div>}
+      {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       <div className='page-toolbar'>
         <h2>Locatários cadastrados ({locatarios.length})</h2>
         <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
-          + Novo Locatário
+          + Novo locatário
         </button>
       </div>
 
@@ -206,8 +233,8 @@ export default function LocatariosPage() {
           <div className='modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h2>{modoEdicao ? 'Editar Locatário' : 'Novo Locatário'}</h2>
-                <p className='modal-description'>Preencha os dados básicos para cadastrar ou atualizar o locatário.</p>
+                <h2>{modoEdicao ? 'Editar locatário' : 'Novo locatário'}</h2>
+                <p className='modal-description'>Preencha os dados de contato e endereço.</p>
               </div>
               <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
             </div>
@@ -219,13 +246,21 @@ export default function LocatariosPage() {
                   <select
                     className='select-field'
                     value={formLocatario.tipoPessoa}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, tipoPessoa: e.target.value as TipoPessoa }))}
+                    onChange={(e) => {
+                      const tipo = e.target.value as TipoPessoa;
+                      setFormLocatario((s) => ({
+                        ...s,
+                        tipoPessoa: tipo,
+                        cpfCnpj: maskCpfCnpj(s.cpfCnpj, tipo)
+                      }));
+                    }}
                     required
                   >
-                    <option value='FISICA'>Física</option>
-                    <option value='JURIDICA'>Jurídica</option>
+                    <option value='FISICA'>Pessoa física</option>
+                    <option value='JURIDICA'>Pessoa jurídica</option>
                   </select>
                 </div>
+
                 <div className='form-group'>
                   <label>Nome <span className='required-star'>*</span></label>
                   <input
@@ -236,18 +271,22 @@ export default function LocatariosPage() {
                     onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
                   />
                 </div>
+
                 <div className='form-group'>
-                  <label>CPF/CNPJ <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='text'
+                  <label>{formLocatario.tipoPessoa === 'JURIDICA' ? 'CNPJ' : 'CPF'} <span className='required-star'>*</span></label>
+                  <MaskedInput
+                    mask='cpfCnpj'
+                    tipoPessoa={formLocatario.tipoPessoa}
                     required
                     value={formLocatario.cpfCnpj}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, cpfCnpj: e.target.value }))}
+                    onValueChange={(cpfCnpj) => setFormLocatario((s) => ({ ...s, cpfCnpj }))}
+                    placeholder={formLocatario.tipoPessoa === 'JURIDICA' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    inputMode='numeric'
                   />
                 </div>
+
                 <div className='form-group'>
-                  <label>Email <span className='required-star'>*</span></label>
+                  <label>E-mail <span className='required-star'>*</span></label>
                   <input
                     className='input-field'
                     type='email'
@@ -256,92 +295,38 @@ export default function LocatariosPage() {
                     onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
                   />
                 </div>
-                <div className='form-group'>
-                  <label>Telefone <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='tel'
-                    required
-                    value={formLocatario.telefone}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, telefone: e.target.value }))}
-                  />
+
+                <div className='form-grid-two'>
+                  <div className='form-group'>
+                    <label>Telefone <span className='required-star'>*</span></label>
+                    <MaskedInput
+                      mask='phone'
+                      required
+                      value={formLocatario.telefone}
+                      onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
+                      placeholder='(00) 0000-0000'
+                      inputMode='tel'
+                    />
+                  </div>
+                  <div className='form-group'>
+                    <label>Celular</label>
+                    <MaskedInput
+                      mask='phone'
+                      value={formLocatario.celular}
+                      onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
+                      placeholder='(00) 00000-0000'
+                      inputMode='tel'
+                    />
+                  </div>
                 </div>
-                <div className='form-group'>
-                  <label>Celular</label>
-                  <input
-                    className='input-field'
-                    type='tel'
-                    value={formLocatario.celular}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, celular: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Endereço <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    required
-                    value={formLocatario.endereco}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, endereco: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Número</label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    value={formLocatario.numero}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, numero: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Complemento</label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    value={formLocatario.complemento}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, complemento: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Bairro</label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    value={formLocatario.bairro}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, bairro: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Cidade <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    required
-                    value={formLocatario.cidade}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, cidade: e.target.value }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>Estado <span className='required-star'>*</span></label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    maxLength={2}
-                    required
-                    value={formLocatario.estado}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, estado: e.target.value.toUpperCase() }))}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label>CEP</label>
-                  <input
-                    className='input-field'
-                    type='text'
-                    value={formLocatario.cep}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, cep: e.target.value }))}
-                  />
-                </div>
+
+                <AddressFields
+                  required
+                  value={formLocatario}
+                  onChange={(patch) => setFormLocatario((s) => ({ ...s, ...patch }))}
+                  onCepChange={(v) => handleCepChange(v, (cep) => setFormLocatario((s) => ({ ...s, cep })))}
+                />
+
                 <div className='form-group'>
                   <label>Observações</label>
                   <textarea
@@ -354,7 +339,7 @@ export default function LocatariosPage() {
 
                 <div className='form-actions'>
                   <button type='submit' className='button button-primary'>
-                    {modoEdicao ? 'Atualizar locatário' : 'Criar locatário'}
+                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar locatário'}
                   </button>
                   <button type='button' className='button button-secondary' onClick={resetForm}>
                     Cancelar
@@ -370,34 +355,43 @@ export default function LocatariosPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Nome</th>
-              <th>Email</th>
-              <th>Telefone</th>
-              <th>Cidade</th>
-              <th>Estado</th>
+              <th>Tipo</th>
+              <th>Documento</th>
+              <th>Contato</th>
+              <th>Localização</th>
               <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {locatarios.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.nome}</td>
-                <td>{item.email}</td>
-                <td>{item.telefone}</td>
-                <td>{item.cidade}</td>
-                <td>{item.estado}</td>
-                <td className='table-actions'>
-                  <button type='button' className='button button-outline' onClick={() => editarLocatario(item)}>
-                    Editar
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={() => excluirLocatario(item.id)}>
-                    Excluir
-                  </button>
+            {locatarios.length === 0 ? (
+              <tr>
+                <td colSpan={6} className='table-empty'>
+                  Nenhum locatário cadastrado.
                 </td>
               </tr>
-            ))}
+            ) : (
+              locatarios.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.nome}</td>
+                  <td>{labelTipoPessoa(item.tipoPessoa)}</td>
+                  <td>{formatCpfCnpjDisplay(item.cpfCnpj, item.tipoPessoa)}</td>
+                  <td>
+                    <div>{item.email}</div>
+                    <small>{formatPhoneDisplay(item.telefone)}</small>
+                  </td>
+                  <td>{formatAddressLine(item)}</td>
+                  <td className='table-actions'>
+                    <button type='button' className='button button-outline' onClick={() => editarLocatario(item)}>
+                      Editar
+                    </button>
+                    <button type='button' className='button button-secondary' onClick={() => excluirLocatario(item.id)}>
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>

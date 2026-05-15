@@ -1,9 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
+import ErrorAlert from '../components/ErrorAlert';
+import MaskedInput from '../components/MaskedInput';
+import { useCepLookup } from '../hooks/useCepLookup';
 import { fetchJson, requestJson } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import { formatAddressLine, formatArea, labelTipoTerreno } from '../lib/format';
+import { maskCep, onlyDigits, parseArea } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
@@ -61,24 +68,44 @@ const defaultTerrenoForm: TerrenoForm = {
   observacoes: ''
 };
 
-function formatTerrenoForm(form: TerrenoForm) {
+function terrenoToForm(terreno: Terreno): TerrenoForm {
+  return {
+    id: terreno.id,
+    tipo: terreno.tipo,
+    endereco: terreno.endereco,
+    numero: terreno.numero ?? '',
+    complemento: terreno.complemento ?? '',
+    bairro: terreno.bairro ?? '',
+    cidade: terreno.cidade,
+    estado: terreno.estado,
+    cep: terreno.cep ? maskCep(terreno.cep) : '',
+    metragemTotal: String(terreno.metragemTotal).replace('.', ','),
+    vagasGaragem: terreno.vagasGaragem?.toString() ?? '',
+    quantidadeSalas: terreno.quantidadeSalas?.toString() ?? '',
+    metragemSalas: terreno.metragemSalas != null ? String(terreno.metragemSalas).replace('.', ',') : '',
+    metragemCasa: terreno.metragemCasa != null ? String(terreno.metragemCasa).replace('.', ',') : '',
+    observacoes: terreno.observacoes ?? ''
+  };
+}
+
+function formatTerrenoPayload(form: TerrenoForm) {
   const payload: Record<string, unknown> = {
     tipo: form.tipo,
-    endereco: form.endereco,
-    numero: form.numero || undefined,
-    complemento: form.complemento || undefined,
-    bairro: form.bairro || undefined,
-    cidade: form.cidade,
+    endereco: form.endereco.trim(),
+    numero: form.numero.trim() || undefined,
+    complemento: form.complemento.trim() || undefined,
+    bairro: form.bairro.trim() || undefined,
+    cidade: form.cidade.trim(),
     estado: form.estado,
-    cep: form.cep || undefined,
-    metragemTotal: form.metragemTotal ? Number(form.metragemTotal) : undefined,
+    cep: form.cep ? onlyDigits(form.cep) : undefined,
+    metragemTotal: parseArea(form.metragemTotal),
     vagasGaragem: form.vagasGaragem ? Number(form.vagasGaragem) : undefined,
     quantidadeSalas: form.quantidadeSalas ? Number(form.quantidadeSalas) : undefined,
-    metragemSalas: form.metragemSalas ? Number(form.metragemSalas) : undefined,
-    metragemCasa: form.metragemCasa ? Number(form.metragemCasa) : undefined,
-    observacoes: form.observacoes || undefined
+    metragemSalas: form.metragemSalas ? parseArea(form.metragemSalas) : undefined,
+    metragemCasa: form.metragemCasa ? parseArea(form.metragemCasa) : undefined,
+    observacoes: form.observacoes.trim() || undefined
   };
-  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined && v !== ''));
 }
 
 export default function TerrenosPage() {
@@ -90,53 +117,15 @@ export default function TerrenosPage() {
   const [formTerreno, setFormTerreno] = useState<TerrenoForm>(defaultTerrenoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const lastCepRef = useRef('');
 
-  const fieldMissing = (value: string) => !value.trim();
+  const updateAddress = useCallback((patch: Partial<TerrenoForm>) => {
+    setFormTerreno((s) => ({ ...s, ...patch }));
+  }, []);
 
-  const formatCep = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
-    if (digits.length > 5) {
-      return `${digits.slice(0, 5)}-${digits.slice(5)}`;
-    }
-    return digits;
-  };
-
-  const lookupCep = async (cepDigits: string) => {
-    try {
-      setErro(null);
-      const response = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
-      if (!response.ok) {
-        throw new Error('Erro ao consultar CEP');
-      }
-      const data = await response.json();
-      if (data.erro) {
-        throw new Error('CEP não encontrado');
-      }
-      setFormTerreno((s) => ({
-        ...s,
-        endereco: data.logradouro || s.endereco,
-        bairro: data.bairro || s.bairro,
-        cidade: data.localidade || s.cidade,
-        estado: data.uf || s.estado
-      }));
-    } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao consultar CEP');
-    }
-  };
-
-  const handleCepChange = async (value: string) => {
-    const formatted = formatCep(value);
-    const digits = formatted.replace(/\D/g, '');
-    setFormTerreno((s) => ({ ...s, cep: formatted }));
-    if (digits.length === 8 && digits !== lastCepRef.current) {
-      lastCepRef.current = digits;
-      await lookupCep(digits);
-    }
-    if (digits.length < 8) {
-      lastCepRef.current = '';
-    }
-  };
+  const { handleCepChange, resetCepRef } = useCepLookup({
+    onAddressUpdate: updateAddress,
+    onError: (msg) => setErro(msg)
+  });
 
   useEffect(() => {
     document.title = 'Gestão de Aluguel - Terrenos';
@@ -148,21 +137,18 @@ export default function TerrenosPage() {
       router.push('/login');
       return;
     }
-
     setIsLoggedIn(true);
     carregarDados();
-    const cleanup = setupUnloadLogout();
-    return cleanup;
+    return setupUnloadLogout();
   }, [router]);
 
   const carregarDados = async () => {
     try {
       setCarregando(true);
-      const loaded = await fetchJson<Terreno>('/api/terrenos');
-      setTerrenos(loaded);
+      setTerrenos(await fetchJson<Terreno>('/api/terrenos'));
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar terrenos');
+      setErro(getErrorMessage(err, 'Erro ao carregar terrenos.'));
     } finally {
       setCarregando(false);
     }
@@ -171,50 +157,34 @@ export default function TerrenosPage() {
   const salvarTerreno = async (event: FormEvent) => {
     event.preventDefault();
     try {
-      const payload = formatTerrenoForm(formTerreno);
+      const payload = formatTerrenoPayload(formTerreno);
       if (modoEdicao && formTerreno.id) {
         await requestJson<Terreno>(`/api/terrenos/${formTerreno.id}`, 'PUT', payload);
       } else {
         await requestJson<Terreno>('/api/terrenos', 'POST', payload);
       }
-      setFormTerreno(defaultTerrenoForm);
-      setModoEdicao(false);
-      setShowModal(false);
+      resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao salvar terreno');
+      setErro(getErrorMessage(err, 'Falha ao salvar terreno.'));
     }
   };
 
   const editarTerreno = (terreno: Terreno) => {
-    setFormTerreno({
-      id: terreno.id,
-      tipo: terreno.tipo,
-      endereco: terreno.endereco,
-      numero: terreno.numero ?? '',
-      complemento: terreno.complemento ?? '',
-      bairro: terreno.bairro ?? '',
-      cidade: terreno.cidade,
-      estado: terreno.estado,
-      cep: terreno.cep ?? '',
-      metragemTotal: terreno.metragemTotal.toString(),
-      vagasGaragem: terreno.vagasGaragem?.toString() ?? '',
-      quantidadeSalas: terreno.quantidadeSalas?.toString() ?? '',
-      metragemSalas: terreno.metragemSalas?.toString() ?? '',
-      metragemCasa: terreno.metragemCasa?.toString() ?? '',
-      observacoes: terreno.observacoes ?? ''
-    });
+    setFormTerreno(terrenoToForm(terreno));
     setModoEdicao(true);
     setShowModal(true);
     setErro(null);
+    resetCepRef();
   };
 
   const excluirTerreno = async (id: number) => {
+    if (!window.confirm('Deseja realmente excluir este terreno?')) return;
     try {
       await requestJson<void>(`/api/terrenos/${id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao excluir terreno');
+      setErro(getErrorMessage(err, 'Falha ao excluir terreno.'));
     }
   };
 
@@ -223,206 +193,133 @@ export default function TerrenosPage() {
     setFormTerreno(defaultTerrenoForm);
     setShowModal(false);
     setErro(null);
-  };
-
-  const abrirNovaFormulario = () => {
-    setModoEdicao(false);
-    setFormTerreno(defaultTerrenoForm);
-    setShowModal(true);
-    setErro(null);
+    resetCepRef();
   };
 
   if (!isLoggedIn) {
-    return <div>Redirecionando para login...</div>;
+    return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
   return (
     <main className='container'>
       <AppHeader
         title='Terrenos'
-        subtitle='Gerencie terrenos comerciais e residenciais, edite informações e exclua registros.'
+        subtitle='Cadastre imóveis comerciais ou residenciais com endereço e metragem.'
       />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
-      {erro && <div className='alert-card alert-error'>{erro}</div>}
+      {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       <div className='page-toolbar'>
         <h2>Terrenos cadastrados ({terrenos.length})</h2>
-        <button type='button' className='button button-primary' onClick={abrirNovaFormulario}>
-          + Novo Terreno
+        <button
+          type='button'
+          className='button button-primary'
+          onClick={() => {
+            setModoEdicao(false);
+            setFormTerreno(defaultTerrenoForm);
+            setShowModal(true);
+            setErro(null);
+            resetCepRef();
+          }}
+        >
+          + Novo terreno
         </button>
       </div>
 
       {showModal && (
         <div className='modal-backdrop' onClick={resetForm}>
-          <div className='modal' onClick={(event) => event.stopPropagation()}>
+          <div className='modal' onClick={(e) => e.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h2>{modoEdicao ? 'Editar Terreno' : 'Novo Terreno'}</h2>
-                <p className='modal-description'>Informe tipo, endereço, metragem e demais dados do terreno.</p>
+                <h2>{modoEdicao ? 'Editar terreno' : 'Novo terreno'}</h2>
+                <p className='modal-description'>Informe tipo, endereço e metragem do imóvel.</p>
               </div>
               <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
             </div>
 
             <div className='modal-content'>
               <form onSubmit={salvarTerreno} className='form-grid'>
-                <div className='form-grid-two'>
-                  <div className='form-group'>
-                    <label>Tipo <span className='required-star'>*</span></label>
-                    <select
-                      className={`select-field${fieldMissing(formTerreno.tipo) ? ' invalid' : ''}`}
-                      value={formTerreno.tipo}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))}
-                      required
-                    >
-                      <option value='COMERCIAL'>Comercial</option>
-                      <option value='RESIDENCIAL'>Residencial</option>
-                    </select>
-                  </div>
+                <div className='form-group'>
+                  <label>Tipo <span className='required-star'>*</span></label>
+                  <select
+                    className='select-field'
+                    value={formTerreno.tipo}
+                    onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))}
+                    required
+                  >
+                    <option value='COMERCIAL'>Comercial</option>
+                    <option value='RESIDENCIAL'>Residencial</option>
+                  </select>
+                </div>
 
-                  <div className='form-group'>
-                    <label>CEP</label>
-                    <input
-                      className='input-field'
-                      type='text'
-                      value={formTerreno.cep}
-                      onChange={(e) => void handleCepChange(e.target.value)}
-                      placeholder='00000-000'
-                      maxLength={9}
-                    />
-                  </div>
+                <AddressFields
+                  required
+                  value={formTerreno}
+                  onChange={(patch) => setFormTerreno((s) => ({ ...s, ...patch }))}
+                  onCepChange={(v) => handleCepChange(v, (cep) => setFormTerreno((s) => ({ ...s, cep })))}
+                />
 
-                  <div className='form-group'>
-                    <label>Endereço <span className='required-star'>*</span></label>
-                    <input
-                      className={`input-field${fieldMissing(formTerreno.endereco) ? ' invalid' : ''}`}
-                      type='text'
-                      value={formTerreno.endereco}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, endereco: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Número</label>
-                    <input
-                      className='input-field'
-                      type='text'
-                      value={formTerreno.numero}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, numero: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Complemento</label>
-                    <input
-                      className='input-field'
-                      type='text'
-                      value={formTerreno.complemento}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, complemento: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Bairro</label>
-                    <input
-                      className='input-field'
-                      type='text'
-                      value={formTerreno.bairro}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, bairro: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Cidade <span className='required-star'>*</span></label>
-                    <input
-                      className={`input-field${fieldMissing(formTerreno.cidade) ? ' invalid' : ''}`}
-                      type='text'
-                      value={formTerreno.cidade}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, cidade: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Estado <span className='required-star'>*</span></label>
-                    <input
-                      className={`input-field${fieldMissing(formTerreno.estado) ? ' invalid' : ''}`}
-                      type='text'
-                      value={formTerreno.estado}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, estado: e.target.value.toUpperCase() }))}
-                      maxLength={2}
-                      required
-                    />
-                  </div>
-
-                  <div className='form-group'>
-                    <label>Metragem total <span className='required-star'>*</span></label>
-                    <input
-                      className={`input-field${fieldMissing(formTerreno.metragemTotal) ? ' invalid' : ''}`}
-                      type='number'
-                      step='0.01'
-                      min='0'
-                      value={formTerreno.metragemTotal}
-                      onChange={(e) => setFormTerreno((s) => ({ ...s, metragemTotal: e.target.value }))}
-                      required
-                    />
-                  </div>
+                <div className='form-group'>
+                  <label>Metragem total <span className='required-star'>*</span></label>
+                  <MaskedInput
+                    mask='area'
+                    required
+                    value={formTerreno.metragemTotal}
+                    onValueChange={(metragemTotal) => setFormTerreno((s) => ({ ...s, metragemTotal }))}
+                    placeholder='Ex.: 500,00'
+                    inputMode='decimal'
+                  />
+                  <span className='field-hint'>Área total do terreno em m²</span>
                 </div>
 
                 {formTerreno.tipo === 'COMERCIAL' && (
                   <div className='form-grid-three'>
                     <div className='form-group'>
-                      <label>Vagas garagem <span className='required-star'>*</span></label>
+                      <label>Vagas de garagem <span className='required-star'>*</span></label>
                       <input
-                        className={`input-field${fieldMissing(formTerreno.vagasGaragem) ? ' invalid' : ''}`}
+                        className='input-field'
                         type='number'
                         min='0'
+                        required
                         value={formTerreno.vagasGaragem}
                         onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))}
-                        required
                       />
                     </div>
                     <div className='form-group'>
-                      <label>Quantidade salas <span className='required-star'>*</span></label>
+                      <label>Quantidade de salas <span className='required-star'>*</span></label>
                       <input
-                        className={`input-field${fieldMissing(formTerreno.quantidadeSalas) ? ' invalid' : ''}`}
+                        className='input-field'
                         type='number'
                         min='0'
+                        required
                         value={formTerreno.quantidadeSalas}
                         onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
-                        required
                       />
                     </div>
                     <div className='form-group'>
-                      <label>Metragem salas <span className='required-star'>*</span></label>
-                      <input
-                        className={`input-field${fieldMissing(formTerreno.metragemSalas) ? ' invalid' : ''}`}
-                        type='number'
-                        step='0.01'
-                        min='0'
-                        value={formTerreno.metragemSalas}
-                        onChange={(e) => setFormTerreno((s) => ({ ...s, metragemSalas: e.target.value }))}
+                      <label>Metragem das salas <span className='required-star'>*</span></label>
+                      <MaskedInput
+                        mask='area'
                         required
+                        value={formTerreno.metragemSalas}
+                        onValueChange={(metragemSalas) => setFormTerreno((s) => ({ ...s, metragemSalas }))}
+                        inputMode='decimal'
                       />
                     </div>
                   </div>
                 )}
 
                 {formTerreno.tipo === 'RESIDENCIAL' && (
-                  <div className='form-grid-two'>
-                    <div className='form-group'>
-                      <label>Metragem casa <span className='required-star'>*</span></label>
-                      <input
-                        className={`input-field${fieldMissing(formTerreno.metragemCasa) ? ' invalid' : ''}`}
-                        type='number'
-                        step='0.01'
-                        min='0'
-                        value={formTerreno.metragemCasa}
-                        onChange={(e) => setFormTerreno((s) => ({ ...s, metragemCasa: e.target.value }))}
-                        required
-                      />
-                    </div>
+                  <div className='form-group'>
+                    <label>Metragem da casa <span className='required-star'>*</span></label>
+                    <MaskedInput
+                      mask='area'
+                      required
+                      value={formTerreno.metragemCasa}
+                      onValueChange={(metragemCasa) => setFormTerreno((s) => ({ ...s, metragemCasa }))}
+                      inputMode='decimal'
+                    />
                   </div>
                 )}
 
@@ -430,15 +327,15 @@ export default function TerrenosPage() {
                   <label>Observações</label>
                   <textarea
                     className='textarea-field'
+                    rows={4}
                     value={formTerreno.observacoes}
                     onChange={(e) => setFormTerreno((s) => ({ ...s, observacoes: e.target.value }))}
-                    rows={4}
                   />
                 </div>
 
                 <div className='form-actions'>
                   <button type='submit' className='button button-primary'>
-                    {modoEdicao ? 'Atualizar terreno' : 'Criar terreno'}
+                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar terreno'}
                   </button>
                   <button type='button' className='button button-secondary' onClick={resetForm}>
                     Cancelar
@@ -454,40 +351,42 @@ export default function TerrenosPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Tipo</th>
               <th>Endereço</th>
-              <th>Cidade</th>
-              <th>Estado</th>
               <th>Metragem</th>
-              <th>Extras</th>
+              <th>Detalhes</th>
               <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {terrenos.map((terreno) => (
-              <tr key={terreno.id}>
-                <td>{terreno.id}</td>
-                <td>{terreno.tipo}</td>
-                <td>{terreno.endereco}{terreno.numero ? `, ${terreno.numero}` : ''}</td>
-                <td>{terreno.cidade}</td>
-                <td>{terreno.estado}</td>
-                <td>{terreno.metragemTotal}</td>
-                <td>
-                  {terreno.tipo === 'COMERCIAL'
-                    ? `Vagas: ${terreno.vagasGaragem ?? '—'} • Salas: ${terreno.quantidadeSalas ?? '—'} • Metragem salas: ${terreno.metragemSalas ?? '—'}`
-                    : `Metragem casa: ${terreno.metragemCasa ?? '—'}`}
-                </td>
-                <td className='table-actions'>
-                  <button type='button' className='button button-outline' onClick={() => editarTerreno(terreno)}>
-                    Editar
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={() => excluirTerreno(terreno.id)}>
-                    Excluir
-                  </button>
+            {terrenos.length === 0 ? (
+              <tr>
+                <td colSpan={5} className='table-empty'>
+                  Nenhum terreno cadastrado.
                 </td>
               </tr>
-            ))}
+            ) : (
+              terrenos.map((terreno) => (
+                <tr key={terreno.id}>
+                  <td>{labelTipoTerreno(terreno.tipo)}</td>
+                  <td>{formatAddressLine(terreno)}</td>
+                  <td>{formatArea(terreno.metragemTotal)}</td>
+                  <td>
+                    {terreno.tipo === 'COMERCIAL'
+                      ? `${terreno.vagasGaragem ?? 0} vagas · ${terreno.quantidadeSalas ?? 0} salas · ${formatArea(terreno.metragemSalas)}`
+                      : `Casa: ${formatArea(terreno.metragemCasa)}`}
+                  </td>
+                  <td className='table-actions'>
+                    <button type='button' className='button button-outline' onClick={() => editarTerreno(terreno)}>
+                      Editar
+                    </button>
+                    <button type='button' className='button button-secondary' onClick={() => excluirTerreno(terreno.id)}>
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>

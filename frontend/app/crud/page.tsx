@@ -2,6 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import ErrorAlert from '../components/ErrorAlert';
+import { fetchJson, getApiBaseUrl, requestJson } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import {
+  formatAddressLine,
+  formatArea,
+  formatCurrency,
+  formatDate,
+  formatPhoneDisplay,
+  labelStatusContrato,
+  labelStatusSala,
+  labelTipoTerreno
+} from '../lib/format';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
@@ -45,27 +58,6 @@ type TerrenoForm = {
   metragemCasa: string;
   observacoes: string;
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
-const fetchJson = async <T,>(path: string): Promise<T[]> => {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`Erro: ${res.status}`);
-  return (await res.json()) as T[];
-};
-
-async function requestJson<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
-  }
-  return (await res.json()) as T;
-}
 
 const defaultTerrenoForm: TerrenoForm = {
   tipo: 'RESIDENCIAL',
@@ -148,7 +140,7 @@ export default function CRUD() {
         estado: data.uf || s.estado
       }));
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao consultar CEP');
+      setErro(getErrorMessage(err, 'Falha ao consultar CEP.'));
     }
   };
 
@@ -193,7 +185,7 @@ export default function CRUD() {
       setContratos(c);
       setErro(null);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      setErro(getErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
       setCarregando(false);
     }
@@ -212,7 +204,7 @@ export default function CRUD() {
       setModoEdicao(false);
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao salvar terreno');
+      setErro(getErrorMessage(err, 'Falha ao salvar terreno.'));
     }
   };
 
@@ -240,14 +232,10 @@ export default function CRUD() {
 
   const excluirTerreno = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/terrenos/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status} ${res.statusText}: ${text}`);
-      }
+      await requestJson<void>(`/api/terrenos/${id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Falha ao excluir terreno');
+      setErro(getErrorMessage(err, 'Falha ao excluir terreno.'));
     }
   };
 
@@ -279,10 +267,10 @@ export default function CRUD() {
         </div>
       </header>
 
-      <p className='small-text'>API base: {API_BASE}</p>
+      <p className='small-text'>API base: {getApiBaseUrl()}</p>
 
       {carregando && <div className='alert-card'>Carregando...</div>}
-      {erro && <div className='alert-card alert-error'>{erro}</div>}
+      {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       <section className='card'>
         <div className='page-header'>
@@ -483,7 +471,6 @@ export default function CRUD() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Tipo</th>
               <th>Endereço</th>
               <th>Cidade</th>
@@ -496,12 +483,11 @@ export default function CRUD() {
           <tbody>
             {terrenos.map((terreno) => (
               <tr key={terreno.id}>
-                <td>{terreno.id}</td>
-                <td>{terreno.tipo}</td>
-                <td>{terreno.endereco}</td>
+                <td>{labelTipoTerreno(terreno.tipo)}</td>
+                <td>{formatAddressLine(terreno)}</td>
                 <td>{terreno.cidade}</td>
                 <td>{terreno.estado}</td>
-                <td>{terreno.metragemTotal}</td>
+                <td>{formatArea(terreno.metragemTotal)}</td>
                 <td>
                   {terreno.tipo === 'COMERCIAL'
                     ? `Vagas: ${terreno.vagasGaragem ?? '—'} • Salas: ${terreno.quantidadeSalas ?? '—'} • Metragem salas: ${terreno.metragemSalas ?? '—'}`
@@ -526,7 +512,6 @@ export default function CRUD() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Identificação</th>
               <th>Metragem</th>
               <th>Status</th>
@@ -535,10 +520,9 @@ export default function CRUD() {
           <tbody>
             {salas.map((item) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
                 <td>{item.identificacao || '—'}</td>
-                <td>{item.metragem ?? '—'}</td>
-                <td>{item.status || '—'}</td>
+                <td>{item.metragem != null ? formatArea(item.metragem) : '—'}</td>
+                <td>{labelStatusSala(item.status)}</td>
               </tr>
             ))}
           </tbody>
@@ -550,7 +534,6 @@ export default function CRUD() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Nome</th>
               <th>Email</th>
               <th>Telefone</th>
@@ -559,10 +542,9 @@ export default function CRUD() {
           <tbody>
             {locatarios.map((item) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
                 <td>{item.nome}</td>
                 <td>{item.email}</td>
-                <td>{item.telefone || '—'}</td>
+                <td>{formatPhoneDisplay(item.telefone)}</td>
               </tr>
             ))}
           </tbody>
@@ -574,7 +556,6 @@ export default function CRUD() {
         <table className='table'>
           <thead>
             <tr>
-              <th>ID</th>
               <th>Valor</th>
               <th>Início</th>
               <th>Fim</th>
@@ -584,11 +565,10 @@ export default function CRUD() {
           <tbody>
             {contratos.map((item) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.valorAluguel ?? '—'}</td>
-                <td>{item.dataInicio || '—'}</td>
-                <td>{item.dataTermino || '—'}</td>
-                <td>{item.status || '—'}</td>
+                <td>{item.valorAluguel != null ? formatCurrency(item.valorAluguel) : '—'}</td>
+                <td>{formatDate(item.dataInicio)}</td>
+                <td>{formatDate(item.dataTermino)}</td>
+                <td>{labelStatusContrato(item.status)}</td>
               </tr>
             ))}
           </tbody>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import ErrorAlert from '../components/ErrorAlert';
 import { clearSession, createSession, isSessionValid } from '../lib/session';
 
 export default function Login() {
@@ -32,7 +33,7 @@ export default function Login() {
         <h2 className='auth-title'>Login</h2>
         <p className='auth-subtitle'>Acesse o sistema de gestão de aluguel de forma segura.</p>
 
-        {erro && <div className='alert-card alert-error'>{erro}</div>}
+        {erro && <ErrorAlert title='Não foi possível entrar' message={erro} onDismiss={() => setErro('')} />}
 
         <form onSubmit={handleSubmit} className='form-grid'>
           <div className='form-group'>

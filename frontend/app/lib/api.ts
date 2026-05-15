@@ -1,47 +1,67 @@
+import {
+  ApiError,
+  createApiErrorFromResponse,
+  getDefaultMessageForStatus,
+  isNetworkError,
+  safeJsonParse
+} from './errors';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
-const getFriendlyErrorMessage = async (res: Response): Promise<string> => {
-  const bodyText = await res.text().catch(() => '');
+async function request(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, init);
+  } catch (error) {
+    if (isNetworkError(error)) {
+      throw new ApiError(
+        'Não foi possível conectar ao servidor. Verifique se o backend está em execução e tente novamente.'
+      );
+    }
+    throw error;
+  }
+}
 
-  if (res.status === 500) {
-    return bodyText
-      ? `Erro interno no servidor. ${bodyText}`
-      : 'Erro interno no servidor. Tente novamente mais tarde.';
+async function handleResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    throw await createApiErrorFromResponse(res);
   }
 
-  if (res.status === 404) {
-    return 'Recurso não encontrado. Verifique se os dados existem ou tente novamente mais tarde.';
+  if (res.status === 204) {
+    return undefined as T;
   }
 
-  if (res.status === 401) {
-    return 'Não autorizado. Faça login novamente.';
-  }
-
-  if (res.status === 403) {
-    return 'Acesso negado. Você não tem permissão para realizar esta operação.';
-  }
-
-  return bodyText ? `Erro ${res.status}: ${bodyText}` : `Erro ${res.status} ao carregar dados.`;
-};
+  return safeJsonParse<T>(res);
+}
 
 export async function fetchJson<T>(path: string): Promise<T[]> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) {
-    throw new Error(await getFriendlyErrorMessage(res));
+  const res = await request(path);
+  const data = await handleResponse<T[] | T>(res);
+
+  if (Array.isArray(data)) {
+    return data;
   }
-  return (await res.json()) as T[];
+
+  if (data == null) {
+    return [];
+  }
+
+  throw new ApiError('O servidor retornou um formato de lista inválido.', {
+    status: res.status
+  });
 }
 
 export async function requestJson<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await request(path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined
   });
 
-  if (!res.ok) {
-    throw new Error(await getFriendlyErrorMessage(res));
-  }
-
-  return (await res.json()) as T;
+  return handleResponse<T>(res);
 }
+
+export function getApiBaseUrl(): string {
+  return API_BASE;
+}
+
+export { ApiError, getDefaultMessageForStatus };
