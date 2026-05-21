@@ -131,7 +131,7 @@ function buildMessageFromBody(body: ApiErrorBody, status: number): string {
     parts.push(body.error);
   }
 
-  if (body.details?.length) {
+  if (body.details && Array.isArray(body.details) && body.details.length) {
     const detailText = body.details
       .slice(0, 3)
       .map((detail) => humanizeTechnicalMessage(detail))
@@ -157,10 +157,11 @@ export async function createApiErrorFromResponse(res: Response): Promise<ApiErro
   const parsed = bodyText ? parseApiErrorBody(bodyText) : null;
 
   if (parsed) {
+    const details = Array.isArray(parsed.details) ? parsed.details : parsed.details ? [parsed.details] : undefined;
     return new ApiError(buildMessageFromBody(parsed, res.status), {
       status: res.status,
       code: parsed.error,
-      details: parsed.details
+      details
     });
   }
 

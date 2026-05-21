@@ -1,9 +1,9 @@
 import {
-  ApiError,
-  createApiErrorFromResponse,
-  getDefaultMessageForStatus,
-  isNetworkError,
-  safeJsonParse
+    ApiError,
+    createApiErrorFromResponse,
+    getDefaultMessageForStatus,
+    isNetworkError,
+    safeJsonParse
 } from './errors';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
@@ -60,8 +60,25 @@ export async function requestJson<T>(path: string, method: string, body?: unknow
   return handleResponse<T>(res);
 }
 
+export async function login(email: string, senha: string): Promise<{ token: string; usuarioId: number; nomeCompleto: string; email: string }> {
+  return requestJson('/api/auth/login', 'POST', { email, senha });
+}
+
+export async function register(email: string, senha: string, nomeCompleto: string): Promise<{ token: string; usuarioId: number; nomeCompleto: string; email: string }> {
+  return requestJson('/api/auth/register', 'POST', { email, senha, nomeCompleto });
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  return requestJson('/api/auth/forgot-password', 'POST', { email });
+}
+
+export async function resetPassword(token: string, novaSenha: string): Promise<void> {
+  return requestJson('/api/auth/reset-password', 'POST', { token, novaSenha });
+}
+
 export function getApiBaseUrl(): string {
   return API_BASE;
 }
 
 export { ApiError, getDefaultMessageForStatus };
+
