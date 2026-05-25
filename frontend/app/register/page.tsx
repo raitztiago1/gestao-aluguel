@@ -38,19 +38,22 @@ export default function Register() {
 
     try {
       // Validações
-      if (!nomeCompleto || !email || !senha || !confirmarSenha) {
+      const trimmedEmail = email.trim();
+      const trimmedNome = nomeCompleto.trim();
+
+      if (!trimmedNome || !trimmedEmail || !senha || !confirmarSenha) {
         setErro('Por favor, preencha todos os campos');
         setLoading(false);
         return;
       }
 
-      if (!email.includes('@') || !email.includes('.')) {
+      if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
         setErro('Por favor, insira um email válido');
         setLoading(false);
         return;
       }
 
-      if (nomeCompleto.length < 3) {
+      if (trimmedNome.length < 3) {
         setErro('O nome completo deve ter pelo menos 3 caracteres');
         setLoading(false);
         return;
@@ -69,7 +72,7 @@ export default function Register() {
         return;
       }
 
-      const response = await register(email, senha, nomeCompleto);
+      const response = await register(trimmedEmail, senha, trimmedNome);
       
       createSession(response);
       router.push('/home');

@@ -536,6 +536,28 @@ CREATE INDEX idx_cobranca_periodo ON cobranca(ano_referencia, mes_referencia);
 CREATE INDEX idx_aditivo_contrato ON aditivo(contrato_id, data);
 
 -- =====================================================
+-- TABELA: usuario (Autenticação)
+-- =====================================================
+CREATE TABLE usuario (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    senha VARCHAR(255) NOT NULL,
+    nome_completo VARCHAR(255) NOT NULL,
+    ativo BOOLEAN DEFAULT true,
+    token_reset_senha VARCHAR(255),
+    expiracao_token_reset TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER update_usuario_updated_at
+    BEFORE UPDATE ON usuario
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE INDEX idx_usuario_email ON usuario(email);
+
+-- =====================================================
 -- Comentários nas tabelas e colunas
 -- =====================================================
 

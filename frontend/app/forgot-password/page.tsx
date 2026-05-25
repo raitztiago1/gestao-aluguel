@@ -47,19 +47,21 @@ function ForgotPasswordContent() {
     setLoading(true);
 
     try {
-      if (!email) {
+      const trimmedEmail = email.trim();
+
+      if (!trimmedEmail) {
         setErro('Por favor, insira seu email');
         setLoading(false);
         return;
       }
 
-      if (!email.includes('@')) {
+      if (!trimmedEmail.includes('@')) {
         setErro('Por favor, insira um email válido');
         setLoading(false);
         return;
       }
 
-      await forgotPassword(email);
+      await forgotPassword(trimmedEmail);
       setSucesso('Se o email for válido, você receberá um link para redefinir sua senha em breve.');
       setEmail('');
       setLoading(false);

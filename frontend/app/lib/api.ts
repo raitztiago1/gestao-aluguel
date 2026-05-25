@@ -1,4 +1,4 @@
-import {
+﻿import {
     ApiError,
     createApiErrorFromResponse,
     getDefaultMessageForStatus,
@@ -7,6 +7,21 @@ import {
 } from './errors';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+
+function getAuthHeaders(): Record<string, string> {
+    if (typeof window === 'undefined') {
+        return {};
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return {};
+    }
+
+    return {
+        Authorization: `Bearer ${token}`
+    };
+}
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
   try {
@@ -34,7 +49,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export async function fetchJson<T>(path: string): Promise<T[]> {
-  const res = await request(path);
+  const res = await request(path, {
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeaders()
+    }
+  });
   const data = await handleResponse<T[] | T>(res);
 
   if (Array.isArray(data)) {
@@ -51,9 +71,18 @@ export async function fetchJson<T>(path: string): Promise<T[]> {
 }
 
 export async function requestJson<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...getAuthHeaders()
+  };
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await request(path, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined
   });
 
@@ -81,4 +110,3 @@ export function getApiBaseUrl(): string {
 }
 
 export { ApiError, getDefaultMessageForStatus };
-

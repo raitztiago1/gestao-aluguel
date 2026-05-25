@@ -207,7 +207,7 @@ export function isNetworkError(error: unknown): boolean {
 export async function safeJsonParse<T>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text.trim()) {
-    throw new ApiError('O servidor retornou uma resposta vazia.', { status: response.status });
+    return undefined as T;
   }
 
   try {

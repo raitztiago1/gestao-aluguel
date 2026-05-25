@@ -1,5 +1,7 @@
 package com.felicioecavalaro.gestao_aluguel.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,25 +26,26 @@ public class AuthController {
     private final AuthenticationService authenticationService;
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authenticationService.login(request);
     }
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public LoginResponse register(@RequestBody RegisterRequest request) {
+    public LoginResponse register(@Valid @RequestBody RegisterRequest request) {
         return authenticationService.register(request);
     }
 
     @PostMapping("/forgot-password")
     @ResponseStatus(HttpStatus.OK)
-    public void forgotPassword(@RequestBody ForgotPasswordRequest request) {
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authenticationService.requestPasswordReset(request);
     }
 
     @PostMapping("/reset-password")
     @ResponseStatus(HttpStatus.OK)
-    public void resetPassword(@RequestBody ResetPasswordRequest request) {
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authenticationService.resetPassword(request);
     }
 }
+

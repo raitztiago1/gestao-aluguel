@@ -28,19 +28,21 @@ export default function Login() {
 
     try {
       // Validação básica
-      if (!email || !senha) {
+      const trimmedEmail = email.trim();
+
+      if (!trimmedEmail || !senha) {
         setErro('Por favor, preencha todos os campos');
         setLoading(false);
         return;
       }
 
-      if (!email.includes('@')) {
+      if (!trimmedEmail.includes('@')) {
         setErro('Por favor, insira um email válido');
         setLoading(false);
         return;
       }
 
-      const response = await login(email, senha);
+      const response = await login(trimmedEmail, senha);
       
       createSession(response);
       router.push('/home');
