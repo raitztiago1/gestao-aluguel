@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual do Usuário - Sistema de Gestão de Aluguel</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --accent: #f8fafc;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --header-bg: #1e293b;
+            --header-text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            background-color: #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+
+        header {
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+        }
+
+        h1 { color: var(--primary); font-size: 2.5em; margin-bottom: 10px; }
+        h2 { color: var(--header-bg); border-left: 5px solid var(--primary); padding-left: 15px; margin-top: 40px; }
+        h3 { color: var(--primary); margin-top: 30px; }
+
+        p { margin-bottom: 15px; }
+
+        /* Estilização das Tabelas (Visual solicitado) */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        th {
+            background-color: var(--header-bg);
+            color: white;
+            text-align: left;
+            padding: 12px 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) { background-color: var(--accent); }
+        tr:hover { background-color: #f1f5f9; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            background: #e2e8f0;
+        }
+
+        .tip {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            margin: 20px 0;
+            font-style: italic;
+        }
+
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; margin: 0; max-width: 100%; padding: 0; }
+            .no-print { display: none; }
+            h2 { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Manual do Usuário</h1>
+            <p><strong>Sistema de Gestão de Aluguel</strong> | Versão 1.0.0</p>
+        </header>
+
+        <div class="no-print tip">
+            💡 <strong>Dica:</strong> Para gerar o PDF, pressione <code>Ctrl + P</code> (Windows) ou <code>Cmd + P</code> (Mac) e escolha "Salvar como PDF".
+        </div>
+
+        <section id="introducao">
+            <h2>1. Introdução</h2>
+            <p>Bem-vindo ao Sistema de Gestão de Aluguel! Este manual foi criado para ajudar você a utilizar todas as funcionalidades do software, desde o primeiro acesso até a gestão completa de seus imóveis e contratos de locação.</p>
+        </section>
+
+        <section id="primeiros-passos">
+            <h2>2. Primeiros Passos</h2>
+            <h3>2.1. Acesso e Registro</h3>
+            <p>Acesse o sistema via navegador. Se for seu primeiro acesso, utilize a tela de <strong>Registro</strong>. A senha deve conter 8 caracteres, maiúsculas e números para garantir a segurança dos dados da holding.</p>
+        </section>
+
+        <section id="imoveis">
+            <h2>3. Gestão de Imóveis</h2>
+            <p>Gerencie terrenos e salas. O sistema valida automaticamente os campos com base no tipo de terreno selecionado.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Campo</th>
+                        <th>Descrição</th>
+                        <th>Aplicação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Tipo</strong></td><td>Comercial ou Residencial.</td><td>Ambos</td></tr>
+                    <tr><td><strong>Vagas Garagem</strong></td><td>Número de vagas disponíveis.</td><td>Comercial</td></tr>
+                    <tr><td><strong>Qtd. Salas</strong></td><td>Quantidade de unidades locáveis.</td><td>Comercial</td></tr>
+                    <tr><td><strong>Metragem Casa</strong></td><td>Área construída total.</td><td>Residencial</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="locatarios">
+            <h2>4. Gestão de Locatários</h2>
+            <p>O sistema diferencia o cadastro entre Pessoa Física (PF) e Pessoa Jurídica (PJ).</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Campo (PF)</th>
+                        <th>Campo (PJ)</th>
+                        <th>Finalidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>CPF</td><td>CNPJ</td><td>Identificação Fiscal</td></tr>
+                    <tr><td>RG / Identidade</td><td>Inscrição Estadual</td><td>Documentação Legal</td></tr>
+                    <tr><td>Estado Civil</td><td>Contato Responsável</td><td>Gestão de Contato</td></tr>
+                    <tr><td>Renda Mensal</td><td>Faturamento (Obs)</td><td>Análise de Crédito</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="contratos">
+            <h2>5. Contratos e Garantias</h2>
+            <p><strong>Regra Crítica:</strong> Todo contrato deve possuir exatamente uma garantia (Fiador OU Caução).</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item do Contrato</th>
+                        <th>Descrição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Sala</strong></td><td>Unidade específica do imóvel.</td></tr>
+                    <tr><td><strong>Garantia XOR</strong></td><td>Seleção obrigatória de 1 Fiador ou 1 Caução.</td></tr>
+                    <tr><td><strong>Dia Vencimento</strong></td><td>Dia do mês para geração automática de cobranças (1-31).</td></tr>
+                    <tr><td><strong>Vigência</strong></td><td>Datas de início e término da locação.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="financeiro">
+            <h2>6. Gestão Financeira</h2>
+            <p>As cobranças são geradas automaticamente. O sistema monitora o status de pagamento e identifica inadimplentes em tempo real.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Significado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="badge">PENDENTE</span></td><td>Aguardando data de vencimento ou pagamento.</td></tr>
+                    <tr><td><span class="badge" style="background:#dcfce7; color:#166534">PAGO</span></td><td>Cobrança liquidada com sucesso.</td></tr>
+                    <tr><td><span class="badge" style="background:#fee2e2; color:#991b1b">INADIMPLENTE</span></td><td>Vencimento ultrapassado sem registro de pagamento.</td></tr>
+                    <tr><td><span class="badge" style="background:#f1f5f9; color:#475569">CANCELADO</span></td><td>Cobrança anulada (ex: rescisão de contrato).</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="suporte">
+            <h2>7. Suporte e Erros</h2>
+            <p>Caso encontre mensagens de erro, verifique as seguintes causas comuns:</p>
+            <ul>
+                <li><strong>Conflito de Dados:</strong> Tentativa de cadastrar CPF/CNPJ já existente.</li>
+                <li><strong>Vínculo Ativo:</strong> Tentativa de excluir imóvel com contrato vigente.</li>
+                <li><strong>Sessão Expirada:</strong> O token de segurança expira a cada 24 horas.</li>
+            </ul>
+        </section>
+
+        <footer style="margin-top: 50px; font-size: 0.8em; text-align: center; color: var(--secondary);">
+            <p>© 2026 Holding Imobiliária - Todos os direitos reservados.</p>
+        </footer>
+    </div>
+</body>
+</html>

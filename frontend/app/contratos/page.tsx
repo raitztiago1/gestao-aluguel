@@ -9,13 +9,13 @@ import StatusBadge from '../components/StatusBadge';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
-  formatCurrency,
-  formatDate,
-  formatLocatarioOption,
-  formatSalaOption
+    formatCurrency,
+    formatDate,
+    formatLocatarioOption,
+    formatSalaOption
 } from '../lib/format';
 import { dateBrToIso, isoToDateBr, maskCurrency, onlyDigits, parseCurrency } from '../lib/masks';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
+import { clearSession, getToken, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVACAO' | 'CANCELADO';
 
@@ -36,6 +36,11 @@ type Contrato = {
   dataTermino: string;
   valorAluguel: number;
   diaVencimento: number;
+  diaVencimentoAgua?: number;
+  diaVencimentoLuz?: number;
+  diaVencimentoIptu?: number;
+  valorOutrasDespesas?: number;
+  documentoUrl?: string;
   status?: StatusContrato;
   observacoes?: string;
 };
@@ -48,6 +53,11 @@ type ContratoForm = {
   dataTermino: string;
   valorAluguel: string;
   diaVencimento: string;
+  diaVencimentoAgua: string;
+  diaVencimentoLuz: string;
+  diaVencimentoIptu: string;
+  valorOutrasDespesas: string;
+  documentoUrl: string;
   status: StatusContrato;
   observacoes: string;
 };
@@ -59,6 +69,11 @@ const defaultContratoForm: ContratoForm = {
   dataTermino: '',
   valorAluguel: '',
   diaVencimento: '',
+  diaVencimentoAgua: '',
+  diaVencimentoLuz: '',
+  diaVencimentoIptu: '',
+  valorOutrasDespesas: '',
+  documentoUrl: '',
   status: 'ATIVO',
   observacoes: ''
 };
@@ -74,6 +89,7 @@ export default function ContratosPage() {
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   useEffect(() => {
     document.title = 'Gestão de Aluguel - Contratos';
@@ -125,15 +141,38 @@ export default function ContratosPage() {
         dataTermino,
         valorAluguel: parseCurrency(formContrato.valorAluguel),
         diaVencimento: Number(onlyDigits(formContrato.diaVencimento)),
+        diaVencimentoAgua: formContrato.diaVencimentoAgua ? Number(onlyDigits(formContrato.diaVencimentoAgua)) : undefined,
+        diaVencimentoLuz: formContrato.diaVencimentoLuz ? Number(onlyDigits(formContrato.diaVencimentoLuz)) : undefined,
+        diaVencimentoIptu: formContrato.diaVencimentoIptu ? Number(onlyDigits(formContrato.diaVencimentoIptu)) : undefined,
+        valorOutrasDespesas: formContrato.valorOutrasDespesas ? parseCurrency(formContrato.valorOutrasDespesas) : undefined,
         status: formContrato.status,
         observacoes: formContrato.observacoes.trim() || undefined
       };
 
+      let saved: Contrato | null = null;
       if (modoEdicao && formContrato.id) {
-        await requestJson<Contrato>(`/api/contratos/${formContrato.id}`, 'PUT', payload);
+        saved = await requestJson<Contrato>(`/api/contratos/${formContrato.id}`, 'PUT', payload);
       } else {
-        await requestJson<Contrato>('/api/contratos', 'POST', payload);
+        saved = await requestJson<Contrato>('/api/contratos', 'POST', payload);
       }
+
+      // If PDF selected, upload it (non-blocking)
+      if (documentFile && saved && saved.id) {
+        try {
+          const token = getToken();
+          const form = new FormData();
+          form.append('file', documentFile, documentFile.name);
+
+          await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'}/api/contratos/${saved.id}/documento`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            body: form
+          });
+        } catch (uploadErr) {
+          setErro('Contrato salvo, mas falha ao enviar o PDF.');
+        }
+      }
+
       resetForm();
       await carregarDados();
     } catch (err) {
@@ -150,6 +189,11 @@ export default function ContratosPage() {
       dataTermino: isoToDateBr(contrato.dataTermino),
       valorAluguel: maskCurrency(String(Math.round((contrato.valorAluguel ?? 0) * 100))),
       diaVencimento: contrato.diaVencimento ? String(contrato.diaVencimento) : '',
+      diaVencimentoAgua: contrato.diaVencimentoAgua ? String(contrato.diaVencimentoAgua) : '',
+      diaVencimentoLuz: contrato.diaVencimentoLuz ? String(contrato.diaVencimentoLuz) : '',
+      diaVencimentoIptu: contrato.diaVencimentoIptu ? String(contrato.diaVencimentoIptu) : '',
+      valorOutrasDespesas: contrato.valorOutrasDespesas ? maskCurrency(String(Math.round(contrato.valorOutrasDespesas * 100))) : '',
+      documentoUrl: contrato.documentoUrl ?? '',
       status: contrato.status ?? 'ATIVO',
       observacoes: contrato.observacoes ?? ''
     });
@@ -299,6 +343,53 @@ export default function ContratosPage() {
                   </div>
                 </div>
 
+                <div className='form-grid-three'>
+                  <div className='form-group'>
+                    <label>Dia de cobrança da água</label>
+                    <MaskedInput
+                      mask='day'
+                      value={formContrato.diaVencimentoAgua}
+                      onValueChange={(diaVencimentoAgua) => setFormContrato((s) => ({ ...s, diaVencimentoAgua }))}
+                      placeholder='Ex.: 10'
+                      inputMode='numeric'
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className='form-group'>
+                    <label>Dia de cobrança da luz</label>
+                    <MaskedInput
+                      mask='day'
+                      value={formContrato.diaVencimentoLuz}
+                      onValueChange={(diaVencimentoLuz) => setFormContrato((s) => ({ ...s, diaVencimentoLuz }))}
+                      placeholder='Ex.: 10'
+                      inputMode='numeric'
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className='form-group'>
+                    <label>Dia de cobrança do IPTU</label>
+                    <MaskedInput
+                      mask='day'
+                      value={formContrato.diaVencimentoIptu}
+                      onValueChange={(diaVencimentoIptu) => setFormContrato((s) => ({ ...s, diaVencimentoIptu }))}
+                      placeholder='Ex.: 10'
+                      inputMode='numeric'
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+
+                <div className='form-group'>
+                  <label>Outras despesas</label>
+                  <MaskedInput
+                    mask='currency'
+                    value={formContrato.valorOutrasDespesas}
+                    onValueChange={(valorOutrasDespesas) => setFormContrato((s) => ({ ...s, valorOutrasDespesas }))}
+                    placeholder='0,00'
+                    inputMode='decimal'
+                  />
+                </div>
+
                 <div className='form-group'>
                   <label>Status</label>
                   <select
@@ -321,6 +412,28 @@ export default function ContratosPage() {
                     value={formContrato.observacoes}
                     onChange={(e) => setFormContrato((s) => ({ ...s, observacoes: e.target.value }))}
                   />
+                </div>
+
+                <div className='form-group'>
+                  <label>Documento do contrato (PDF)</label>
+                  <input
+                    type='file'
+                    accept='application/pdf'
+                    onChange={(e) => setDocumentFile(e.target.files && e.target.files.length ? e.target.files[0] : null)}
+                  />
+                  {formContrato.documentoUrl && formContrato.id && (
+                    <div className='field-hint'>
+                      Documento existente:{' '}
+                      <a
+                        href={`/api/contratos/${formContrato.id}/documento`}
+                        target='_blank'
+                        rel='noreferrer'
+                      >
+                        baixar contrato
+                      </a>
+                    </div>
+                  )}
+                  <span className='field-hint'>Anexe um PDF do contrato (opcional).</span>
                 </div>
 
                 <div className='form-actions'>
@@ -346,6 +459,7 @@ export default function ContratosPage() {
               <th>Período</th>
               <th>Valor</th>
               <th>Vencimento</th>
+              <th>Contrato</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>
@@ -353,7 +467,7 @@ export default function ContratosPage() {
           <tbody>
             {contratos.length === 0 ? (
               <tr>
-                <td colSpan={7} className='table-empty'>
+                <td colSpan={8} className='table-empty'>
                   Nenhum contrato cadastrado.
                 </td>
               </tr>
@@ -366,7 +480,24 @@ export default function ContratosPage() {
                     {formatDate(item.dataInicio)} — {formatDate(item.dataTermino)}
                   </td>
                   <td>{formatCurrency(item.valorAluguel)}</td>
-                  <td>Dia {item.diaVencimento}</td>
+                  <td>
+                    <div>Dia {item.diaVencimento}</div>
+                    {item.diaVencimentoAgua != null && <div>Água: dia {item.diaVencimentoAgua}</div>}
+                    {item.diaVencimentoLuz != null && <div>Luz: dia {item.diaVencimentoLuz}</div>}
+                    {item.diaVencimentoIptu != null && <div>IPTU: dia {item.diaVencimentoIptu}</div>}
+                    {item.valorOutrasDespesas != null && item.valorOutrasDespesas > 0 && (
+                      <div>Outras: {formatCurrency(item.valorOutrasDespesas)}</div>
+                    )}
+                  </td>
+                  <td>
+                    {item.documentoUrl ? (
+                      <a href={`/api/contratos/${item.id}/documento`} target='_blank' rel='noreferrer'>
+                        Baixar
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td>
                     <StatusBadge kind='contrato' status={item.status} />
                   </td>

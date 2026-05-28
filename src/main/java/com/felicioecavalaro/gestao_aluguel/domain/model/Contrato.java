@@ -66,6 +66,18 @@ public class Contrato {
     @Column(name = "dia_vencimento", nullable = false)
     private Integer diaVencimento;
 
+    @Column(name = "dia_vencimento_agua")
+    private Integer diaVencimentoAgua;
+
+    @Column(name = "dia_vencimento_luz")
+    private Integer diaVencimentoLuz;
+
+    @Column(name = "dia_vencimento_iptu")
+    private Integer diaVencimentoIptu;
+
+    @Column(name = "valor_outras_despesas")
+    private BigDecimal valorOutrasDespesas;
+
     @Column(name = "regras_pagamento", columnDefinition = "text")
     private String regrasPagamento;
 
