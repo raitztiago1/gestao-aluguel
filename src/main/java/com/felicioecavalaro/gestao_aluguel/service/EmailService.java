@@ -55,7 +55,8 @@ public class EmailService {
             helper.addAttachment(attachment.getName(), attachment);
 
             mailSender.send(message);
-            log.info("Email de backup mensal enviado com anexo {} para {} destinatário(s)", attachment.getName(), countRecipients(recipients));
+            log.info("Email de backup mensal enviado com anexo {} para {} destinatário(s)", attachment.getName(),
+                    countRecipients(recipients));
         } catch (MessagingException e) {
             log.error("Falha ao enviar o email de backup mensal", e);
             throw new RuntimeException("Falha ao enviar o email de backup mensal", e);
