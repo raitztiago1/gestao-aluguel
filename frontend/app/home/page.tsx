@@ -535,7 +535,7 @@ export default function Home() {
             ))}
           </ul>
         </div>
-      )}
+
 
       <section className='card'>
         <h2>Vencimentos dos aluguéis ({contratos.length})</h2>
