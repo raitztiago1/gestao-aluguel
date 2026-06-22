@@ -12,6 +12,7 @@ export default function Register() {
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [erro, setErro] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -43,12 +44,14 @@ export default function Register() {
 
       if (!trimmedNome || !trimmedEmail || !senha || !confirmarSenha) {
         setErro('Por favor, preencha todos os campos');
+        setEmailError('');
         setLoading(false);
         return;
       }
 
       if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
         setErro('Por favor, insira um email válido');
+        setEmailError('O email informado parece estar incorreto. Verifique o formato e tente novamente.');
         setLoading(false);
         return;
       }
@@ -68,6 +71,7 @@ export default function Register() {
 
       if (senha !== confirmarSenha) {
         setErro('As senhas não correspondem');
+        setEmailError('');
         setLoading(false);
         return;
       }
@@ -107,11 +111,15 @@ export default function Register() {
 
           <div className='form-group'>
             <label>Email</label>
+            {emailError && <span className='field-error'>{emailError}</span>}
             <input
-              className='input-field'
+              className={`input-field${emailError ? ' invalid' : ''}`}
               type='email'
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError('');
+              }}
               required
               disabled={loading}
               placeholder='seu@email.com'

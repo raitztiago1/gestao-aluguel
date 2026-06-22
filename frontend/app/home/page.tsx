@@ -51,7 +51,17 @@ type Contrato = {
   locatario?: { nome?: string };
 };
 
-type ModalType = 'terrenos' | 'contratos' | 'salas' | null;
+type ModalType = 'terrenos' | 'contratos' | 'salas' | 'pagamentos' | null;
+
+type Cobranca = {
+  id: number;
+  ano: number;
+  mes: number;
+  valor: number;
+  status: 'PENDENTE' | 'PAGO' | 'INADIMPLENTE' | 'CANCELADO';
+  dataPagamento?: string;
+  observacoes?: string;
+};
 
 export default function Home() {
   const router = useRouter();
@@ -63,6 +73,14 @@ export default function Home() {
   const [salasDisponiveisCount, setSalasDisponiveisCount] = useState(0);
   const [contratosAtivosCount, setContratosAtivosCount] = useState(0);
   const [selectedModal, setSelectedModal] = useState<ModalType>(null);
+  const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
+  const [cobrancas, setCobrancas] = useState<Cobranca[]>([]);
+  const [novaCobranca, setNovaCobranca] = useState<Partial<Cobranca>>({
+    mes: new Date().getMonth() + 1,
+    ano: new Date().getFullYear(),
+    status: 'PENDENTE'
+  });
+  const [carregandoCobrancas, setCarregandoCobrancas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -100,6 +118,86 @@ export default function Home() {
       setErro(getErrorMessage(err, 'Erro ao carregar dados do painel.'));
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const carregarCobrancas = async (contratoId: number) => {
+    try {
+      setCarregandoCobrancas(true);
+      const dados = await fetchJson<Cobranca>(`/api/cobrancas/contrato/${contratoId}`);
+      setCobrancas(dados || []);
+    } catch (err) {
+      setErro(getErrorMessage(err, 'Erro ao carregar cobranças.'));
+    } finally {
+      setCarregandoCobrancas(false);
+    }
+  };
+
+  const abrirModalPagamentos = (contrato: Contrato) => {
+    setContratoSelecionado(contrato);
+    setSelectedModal('pagamentos');
+    setNovaCobranca({
+      mes: new Date().getMonth() + 1,
+      ano: new Date().getFullYear(),
+      status: 'PENDENTE'
+    });
+    carregarCobrancas(contrato.id);
+  };
+
+  const registrarPagamento = async () => {
+    if (!contratoSelecionado || !novaCobranca.status || !novaCobranca.mes || !novaCobranca.ano) {
+      setErro('Preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/cobrancas/contrato/${contratoSelecionado.id}/mes/${novaCobranca.ano}/${novaCobranca.mes}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: novaCobranca.status,
+          valor: novaCobranca.valor || contratoSelecionado.valorAluguel,
+          dataPagamento: novaCobranca.dataPagamento,
+          observacoes: novaCobranca.observacoes
+        })
+      });
+
+      if (!response.ok) throw new Error('Erro ao registrar pagamento');
+
+      await carregarCobrancas(contratoSelecionado.id);
+      setNovaCobranca({
+        mes: new Date().getMonth() + 1,
+        ano: new Date().getFullYear(),
+        status: 'PENDENTE'
+      });
+      setErro(null);
+    } catch (err) {
+      setErro(getErrorMessage(err, 'Erro ao registrar pagamento.'));
+    }
+  };
+
+  const obterLabelStatus = (status: string) => {
+    const labels: Record<string, string> = {
+      PENDENTE: 'Pendente',
+      PAGO: 'Pago',
+      INADIMPLENTE: 'Inadimplente',
+      CANCELADO: 'Cancelado'
+    };
+    return labels[status] || status;
+  };
+
+  const obterClasseStatus = (status: string) => {
+    switch (status) {
+      case 'PAGO':
+        return 'badge badge-success';
+      case 'INADIMPLENTE':
+        return 'badge badge-danger';
+      case 'PENDENTE':
+        return 'badge badge-warning';
+      case 'CANCELADO':
+        return 'badge badge-neutral';
+      default:
+        return 'badge';
     }
   };
 
@@ -291,7 +389,140 @@ export default function Home() {
         </div>
       )}
 
-      {contratosEmAtraso.length > 0 && (
+      {selectedModal === 'pagamentos' && contratoSelecionado && (
+        <div className='modal-backdrop' onClick={() => setSelectedModal(null)}>
+          <div className='modal modal-large' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h2>Gerenciar Pagamentos</h2>
+                <p className='modal-description'>
+                  {contratoSelecionado.locatario?.nome} — Sala {contratoSelecionado.sala?.identificacao}
+                </p>
+              </div>
+              <button className='modal-close' onClick={() => setSelectedModal(null)} aria-label='Fechar modal'>
+                ×
+              </button>
+            </div>
+
+            <div className='modal-content'>
+              {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
+
+              <div className='form-section'>
+                <h3>Registrar Pagamento</h3>
+                <div className='form-group'>
+                  <label htmlFor='ano'>Ano</label>
+                  <input
+                    id='ano'
+                    type='number'
+                    value={novaCobranca.ano || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, ano: parseInt(e.target.value) })}
+                    min='2020'
+                    max={new Date().getFullYear() + 1}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label htmlFor='mes'>Mês</label>
+                  <select
+                    id='mes'
+                    value={novaCobranca.mes || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, mes: parseInt(e.target.value) })}
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(2024, i).toLocaleString('pt-BR', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label htmlFor='status'>Status</label>
+                  <select
+                    id='status'
+                    value={novaCobranca.status || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, status: e.target.value as Cobranca['status'] })}
+                  >
+                    <option value='PENDENTE'>Pendente</option>
+                    <option value='PAGO'>Pago</option>
+                    <option value='INADIMPLENTE'>Inadimplente</option>
+                    <option value='CANCELADO'>Cancelado</option>
+                  </select>
+                </div>
+                <div className='form-group'>
+                  <label htmlFor='valor'>Valor</label>
+                  <input
+                    id='valor'
+                    type='number'
+                    step='0.01'
+                    value={novaCobranca.valor || contratoSelecionado.valorAluguel || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, valor: parseFloat(e.target.value) })}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label htmlFor='dataPagamento'>Data de Pagamento</label>
+                  <input
+                    id='dataPagamento'
+                    type='date'
+                    value={novaCobranca.dataPagamento || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, dataPagamento: e.target.value })}
+                  />
+                </div>
+                <div className='form-group'>
+                  <label htmlFor='observacoes'>Observações</label>
+                  <textarea
+                    id='observacoes'
+                    value={novaCobranca.observacoes || ''}
+                    onChange={(e) => setNovaCobranca({ ...novaCobranca, observacoes: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <button className='button button-primary' onClick={registrarPagamento}>
+                  Registrar Pagamento
+                </button>
+              </div>
+
+              <div className='form-section'>
+                <h3>Histórico de Pagamentos</h3>
+                {carregandoCobrancas ? (
+                  <p>Carregando histórico...</p>
+                ) : cobrancas.length === 0 ? (
+                  <p>Nenhum registro de pagamento.</p>
+                ) : (
+                  <div className='table-scroll'>
+                    <table className='table'>
+                      <thead>
+                        <tr>
+                          <th>Período</th>
+                          <th>Valor</th>
+                          <th>Status</th>
+                          <th>Data Pagamento</th>
+                          <th>Observações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cobrancas.map((cobranca) => (
+                          <tr key={cobranca.id}>
+                            <td>
+                              {new Date(2024, cobranca.mes - 1).toLocaleString('pt-BR', { month: 'short' })}/{cobranca.ano}
+                            </td>
+                            <td>{formatCurrency(cobranca.valor)}</td>
+                            <td>
+                              <span className={obterClasseStatus(cobranca.status)}>
+                                {obterLabelStatus(cobranca.status)}
+                              </span>
+                            </td>
+                            <td>{cobranca.dataPagamento ? new Date(cobranca.dataPagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                            <td>{cobranca.observacoes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         <div className='alert-card alert-warning'>
           <h3>Contratos em atraso</h3>
           <p>Existem {contratosEmAtraso.length} contrato(s) com pagamento em atraso.</p>
@@ -318,12 +549,13 @@ export default function Home() {
               <th>Vencimento</th>
               <th>Status</th>
               <th>Situação</th>
+              <th>Ação</th>
             </tr>
           </thead>
           <tbody>
             {contratos.length === 0 ? (
               <tr>
-                <td colSpan={7} className='table-empty'>
+                <td colSpan={8} className='table-empty'>
                   Nenhum contrato cadastrado.
                 </td>
               </tr>
@@ -342,6 +574,15 @@ export default function Home() {
                       <span className={emAtraso ? 'badge badge-danger' : 'badge badge-success'}>
                         {emAtraso ? 'Em atraso' : 'Em dia'}
                       </span>
+                    </td>
+                    <td>
+                      <button
+                        className='button button-small'
+                        onClick={() => abrirModalPagamentos(contrato)}
+                        title='Gerenciar pagamentos deste contrato'
+                      >
+                        Gerenciar
+                      </button>
                     </td>
                   </tr>
                 );

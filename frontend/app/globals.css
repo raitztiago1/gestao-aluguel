@@ -403,6 +403,11 @@ body {
   flex-direction: column;
 }
 
+.modal-large {
+  width: min(100%, 1200px);
+  max-height: 95vh;
+}
+
 .modal-header {
   display: flex;
   align-items: flex-start;
@@ -433,6 +438,52 @@ body {
 .modal-section {
   display: grid;
   gap: 1rem;
+}
+
+.form-section {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-radius: 0.85rem;
+  border: 1px solid #dfe3e8;
+}
+
+.form-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  color: #102a43;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid #dfe3e8;
+  border-radius: 0.85rem;
+  background: #ffffff;
+  color: #102a43;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #0f62fe;
+  box-shadow: 0 0 0 4px rgba(15, 98, 254, 0.12);
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.button-small {
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
 }
 
 .table-scroll {
@@ -506,6 +557,12 @@ label {
 .textarea-field.invalid {
   border-color: #da1e28;
   background: #fff1f0;
+}
+
+.field-error {
+  color: #a50e26;
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
 }
 
 .input-field:focus,
