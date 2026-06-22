@@ -23,7 +23,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "cobranca", uniqueConstraints = @UniqueConstraint(columnNames = {"contrato_id", "ano", "mes"}))
+@Table(name = "cobranca", uniqueConstraints = @UniqueConstraint(columnNames = { "contrato_id", "ano", "mes" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

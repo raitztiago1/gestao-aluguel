@@ -7,11 +7,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,11 +17,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusCobranca;
-import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class CobrancaServiceTest {

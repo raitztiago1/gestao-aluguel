@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +13,7 @@ import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service

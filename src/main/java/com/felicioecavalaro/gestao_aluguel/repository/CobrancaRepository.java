@@ -9,5 +9,6 @@ import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 
 public interface CobrancaRepository extends JpaRepository<Cobranca, Long> {
     List<Cobranca> findAllByContratoIdOrderByAnoDescMesDesc(Long contratoId);
+
     Optional<Cobranca> findByContratoIdAndAnoAndMes(Long contratoId, Integer ano, Integer mes);
 }
