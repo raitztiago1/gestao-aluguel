@@ -36,3 +36,9 @@ build/
 node_modules/
 frontend/node_modules/
 frontend/.next/
+
+### Env ###
+.env
+
+### Playwright MCP (debug artifacts) ###
+.playwright-mcp/
