@@ -127,7 +127,7 @@ class CobrancaServiceTest {
 
         when(contratoRepository.findById(1L)).thenReturn(Optional.of(contrato));
         when(repo.findByContratoIdAndAnoAndMes(1L, 2024, 6)).thenReturn(Optional.empty());
-        when(repo.save(any(Cobranca.class))).thenReturn(sampleCobranca());
+        when(repo.save(any(Cobranca.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Cobranca result = service.registerMonthlyStatus(1L, 2024, 6, payload);
 

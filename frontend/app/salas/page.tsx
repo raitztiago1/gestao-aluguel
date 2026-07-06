@@ -13,6 +13,8 @@ import { maskArea, parseArea } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
+type SortDirection = 'asc' | 'desc';
+type SalaSortKey = 'identificacao' | 'terreno' | 'metragem' | 'status';
 
 type Terreno = {
   id: number;
@@ -60,6 +62,16 @@ export default function SalasPage() {
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: SalaSortKey; direction: SortDirection }>({
+    key: 'identificacao',
+    direction: 'asc'
+  });
+
+  const terrenosDisponiveisParaSala = terrenos.filter((terreno) => {
+    const isCurrentSelection = formSala.terrenoId === String(terreno.id);
+    const alreadyHasSala = salas.some((sala) => sala.terreno?.id === terreno.id);
+    return isCurrentSelection || !alreadyHasSala || terreno.tipo === 'COMERCIAL';
+  });
 
   useEffect(() => {
     document.title = 'Gestão de Aluguel - Salas';
@@ -148,6 +160,51 @@ export default function SalasPage() {
     setErro(null);
   };
 
+  const handleSort = (key: SalaSortKey) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedSalas = [...salas].sort((a, b) => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const valueA = (() => {
+      switch (sortConfig.key) {
+        case 'identificacao':
+          return a.identificacao.toLowerCase();
+        case 'terreno':
+          return (a.terreno ? formatAddressLine(a.terreno) : '—').toLowerCase();
+        case 'metragem':
+          return a.metragem;
+        case 'status':
+          return a.status ?? 'DISPONIVEL';
+        default:
+          return '';
+      }
+    })();
+    const valueB = (() => {
+      switch (sortConfig.key) {
+        case 'identificacao':
+          return b.identificacao.toLowerCase();
+        case 'terreno':
+          return (b.terreno ? formatAddressLine(b.terreno) : '—').toLowerCase();
+        case 'metragem':
+          return b.metragem;
+        case 'status':
+          return b.status ?? 'DISPONIVEL';
+        default:
+          return '';
+      }
+    })();
+
+    if (typeof valueA === 'number' && typeof valueB === 'number') {
+      return (valueA - valueB) * direction;
+    }
+
+    return String(valueA).localeCompare(String(valueB)) * direction;
+  });
+
   if (!isLoggedIn) {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
@@ -195,7 +252,7 @@ export default function SalasPage() {
                     onChange={(e) => setFormSala((s) => ({ ...s, terrenoId: e.target.value }))}
                   >
                     <option value=''>Selecione o terreno</option>
-                    {terrenos.map((terreno) => (
+                    {terrenosDisponiveisParaSala.map((terreno) => (
                       <option key={terreno.id} value={terreno.id}>
                         {formatTerrenoOption(terreno)}
                       </option>
@@ -268,10 +325,26 @@ export default function SalasPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>Sala</th>
-              <th>Terreno</th>
-              <th>Metragem</th>
-              <th>Status</th>
+              <th>
+                <button type='button' onClick={() => handleSort('identificacao')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Sala {sortConfig.key === 'identificacao' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('terreno')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Terreno {sortConfig.key === 'terreno' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('metragem')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Metragem {sortConfig.key === 'metragem' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('status')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -283,7 +356,7 @@ export default function SalasPage() {
                 </td>
               </tr>
             ) : (
-              salas.map((sala) => (
+              sortedSalas.map((sala) => (
                 <tr key={sala.id}>
                   <td>{sala.identificacao}</td>
                   <td>{sala.terreno ? formatAddressLine(sala.terreno) : '—'}</td>

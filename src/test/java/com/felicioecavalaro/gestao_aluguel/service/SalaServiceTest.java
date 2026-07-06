@@ -2,6 +2,7 @@ package com.felicioecavalaro.gestao_aluguel.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,8 +16,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.felicioecavalaro.gestao_aluguel.domain.enums.TipoTerreno;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Terreno;
+import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
+import com.felicioecavalaro.gestao_aluguel.repository.TerrenoRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -25,6 +30,12 @@ class SalaServiceTest {
 
     @Mock
     private SalaRepository repo;
+
+    @Mock
+    private ContratoRepository contratoRepository;
+
+    @Mock
+    private TerrenoRepository terrenoRepository;
 
     @InjectMocks
     private SalaService service;
@@ -66,7 +77,7 @@ class SalaServiceTest {
         Sala created = service.create(sala);
 
         assertEquals(sala, created);
-        verify(repo).save(sala);
+        verify(repo, atLeastOnce()).save(sala);
     }
 
     @Test
@@ -81,6 +92,21 @@ class SalaServiceTest {
     }
 
     @Test
+    void createThrowsWhenResidentialTerrenoAlreadyHasASala() {
+        Terreno terreno = Terreno.builder().id(10L).tipo(TipoTerreno.RESIDENCIAL).build();
+        Sala existingSala = Sala.builder().id(99L).terreno(terreno).build();
+        Sala newSala = Sala.builder().identificacao("Sala 2").terreno(terreno).build();
+
+        when(terrenoRepository.findById(10L)).thenReturn(Optional.of(terreno));
+        when(repo.findAll()).thenReturn(List.of(existingSala));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> service.create(newSala));
+
+        assertEquals("Terreno residencial já possui uma sala cadastrada", exception.getMessage());
+        verify(repo).findAll();
+    }
+
+    @Test
     void updateSavesExistingSala() {
         Sala sala = sampleSala();
         when(repo.existsById(1L)).thenReturn(true);
@@ -91,7 +117,7 @@ class SalaServiceTest {
         assertEquals(sala, updated);
         assertEquals(1L, updated.getId());
         verify(repo).existsById(1L);
-        verify(repo).save(sala);
+        verify(repo, atLeastOnce()).save(sala);
     }
 
     @Test

@@ -14,6 +14,8 @@ import { maskCep, onlyDigits, parseArea } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
+type SortDirection = 'asc' | 'desc';
+type TerrenoSortKey = 'tipo' | 'endereco' | 'metragemTotal' | 'detalhes';
 
 type Terreno = {
   id: number;
@@ -117,6 +119,10 @@ export default function TerrenosPage() {
   const [formTerreno, setFormTerreno] = useState<TerrenoForm>(defaultTerrenoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: TerrenoSortKey; direction: SortDirection }>({
+    key: 'endereco',
+    direction: 'asc'
+  });
 
   const updateAddress = useCallback((patch: Partial<TerrenoForm>) => {
     setFormTerreno((s) => ({ ...s, ...patch }));
@@ -195,6 +201,55 @@ export default function TerrenosPage() {
     setErro(null);
     resetCepRef();
   };
+
+  const handleSort = (key: TerrenoSortKey) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedTerrenos = [...terrenos].sort((a, b) => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const valueA = (() => {
+      switch (sortConfig.key) {
+        case 'tipo':
+          return labelTipoTerreno(a.tipo);
+        case 'endereco':
+          return formatAddressLine(a).toLowerCase();
+        case 'metragemTotal':
+          return a.metragemTotal;
+        case 'detalhes':
+          return a.tipo === 'COMERCIAL'
+            ? `${a.vagasGaragem ?? 0} ${a.quantidadeSalas ?? 0} ${a.metragemSalas ?? 0}`
+            : `${a.metragemCasa ?? 0}`;
+        default:
+          return '';
+      }
+    })();
+    const valueB = (() => {
+      switch (sortConfig.key) {
+        case 'tipo':
+          return labelTipoTerreno(b.tipo);
+        case 'endereco':
+          return formatAddressLine(b).toLowerCase();
+        case 'metragemTotal':
+          return b.metragemTotal;
+        case 'detalhes':
+          return b.tipo === 'COMERCIAL'
+            ? `${b.vagasGaragem ?? 0} ${b.quantidadeSalas ?? 0} ${b.metragemSalas ?? 0}`
+            : `${b.metragemCasa ?? 0}`;
+        default:
+          return '';
+      }
+    })();
+
+    if (typeof valueA === 'number' && typeof valueB === 'number') {
+      return (valueA - valueB) * direction;
+    }
+
+    return String(valueA).localeCompare(String(valueB)) * direction;
+  });
 
   if (!isLoggedIn) {
     return <div className='alert-card'>Redirecionando para login...</div>;
@@ -351,10 +406,26 @@ export default function TerrenosPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>Tipo</th>
-              <th>Endereço</th>
-              <th>Metragem</th>
-              <th>Detalhes</th>
+              <th>
+                <button type='button' onClick={() => handleSort('tipo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Tipo {sortConfig.key === 'tipo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('endereco')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Endereço {sortConfig.key === 'endereco' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('metragemTotal')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Metragem {sortConfig.key === 'metragemTotal' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('detalhes')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Detalhes {sortConfig.key === 'detalhes' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -366,7 +437,7 @@ export default function TerrenosPage() {
                 </td>
               </tr>
             ) : (
-              terrenos.map((terreno) => (
+              sortedTerrenos.map((terreno) => (
                 <tr key={terreno.id}>
                   <td>{labelTipoTerreno(terreno.tipo)}</td>
                   <td>{formatAddressLine(terreno)}</td>

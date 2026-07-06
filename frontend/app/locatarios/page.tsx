@@ -19,6 +19,8 @@ import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../lib/masks';
 import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoPessoa = 'FISICA' | 'JURIDICA';
+type SortDirection = 'asc' | 'desc';
+type LocatarioSortKey = 'nome' | 'tipo' | 'documento' | 'localizacao';
 
 type Locatario = {
   id: number;
@@ -102,6 +104,10 @@ export default function LocatariosPage() {
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: LocatarioSortKey; direction: SortDirection }>({
+    key: 'nome',
+    direction: 'asc'
+  });
 
   const updateAddress = useCallback((patch: Partial<LocatarioForm>) => {
     setFormLocatario((s) => ({ ...s, ...patch }));
@@ -274,6 +280,47 @@ export default function LocatariosPage() {
     resetCepRef();
   };
 
+  const handleSort = (key: LocatarioSortKey) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedLocatarios = [...locatarios].sort((a, b) => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const valueA = (() => {
+      switch (sortConfig.key) {
+        case 'nome':
+          return a.nome.toLowerCase();
+        case 'tipo':
+          return labelTipoPessoa(a.tipoPessoa);
+        case 'documento':
+          return formatCpfCnpjDisplay(a.cpfCnpj, a.tipoPessoa).toLowerCase();
+        case 'localizacao':
+          return formatAddressLine(a).toLowerCase();
+        default:
+          return '';
+      }
+    })();
+    const valueB = (() => {
+      switch (sortConfig.key) {
+        case 'nome':
+          return b.nome.toLowerCase();
+        case 'tipo':
+          return labelTipoPessoa(b.tipoPessoa);
+        case 'documento':
+          return formatCpfCnpjDisplay(b.cpfCnpj, b.tipoPessoa).toLowerCase();
+        case 'localizacao':
+          return formatAddressLine(b).toLowerCase();
+        default:
+          return '';
+      }
+    })();
+
+    return String(valueA).localeCompare(String(valueB)) * direction;
+  });
+
   if (!isLoggedIn) {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
@@ -422,11 +469,27 @@ export default function LocatariosPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Tipo</th>
-              <th>Documento</th>
+              <th>
+                <button type='button' onClick={() => handleSort('nome')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Nome {sortConfig.key === 'nome' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('tipo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Tipo {sortConfig.key === 'tipo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('documento')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Documento {sortConfig.key === 'documento' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Contato</th>
-              <th>Localização</th>
+              <th>
+                <button type='button' onClick={() => handleSort('localizacao')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Localização {sortConfig.key === 'localizacao' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -438,7 +501,7 @@ export default function LocatariosPage() {
                 </td>
               </tr>
             ) : (
-              locatarios.map((item) => (
+              sortedLocatarios.map((item) => (
                 <tr key={item.id}>
                   <td>{item.nome}</td>
                   <td>{labelTipoPessoa(item.tipoPessoa)}</td>

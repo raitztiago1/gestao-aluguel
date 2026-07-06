@@ -18,10 +18,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
+import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
+import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -30,6 +33,12 @@ class ContratoServiceTest {
 
     @Mock
     private ContratoRepository repo;
+
+    @Mock
+    private SalaRepository salaRepository;
+
+    @Mock
+    private CobrancaRepository cobrancaRepository;
 
     @InjectMocks
     private ContratoService service;
@@ -80,6 +89,44 @@ class ContratoServiceTest {
     }
 
     @Test
+    void findAllMarksContratoAsEmAbertoBeforeDueDateWhenNoPaymentExists() {
+        LocalDate hoje = LocalDate.now();
+        int diaVencimento = Math.min(hoje.getDayOfMonth() + 1, hoje.lengthOfMonth());
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .diaVencimento(diaVencimento)
+                .build();
+
+        when(repo.findAll()).thenReturn(List.of(contrato));
+        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(List.of());
+
+        List<Contrato> result = service.findAll();
+
+        assertEquals("EM_ABERTO", result.get(0).getSituacao());
+    }
+
+    @Test
+    void createThrowsWhenSalaAlreadyHasAnActiveContractInThePeriod() {
+        Contrato contrato = sampleContrato();
+        Sala sala = new Sala();
+        sala.setId(1L);
+        contrato.setSala(sala);
+        Contrato existing = Contrato.builder()
+                .id(2L)
+                .sala(sala)
+                .dataInicio(LocalDate.now().minusDays(10))
+                .dataTermino(LocalDate.now().plusDays(10))
+                .status(StatusContrato.ATIVO)
+                .build();
+
+        when(repo.findBySalaId(1L)).thenReturn(List.of(existing));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> service.create(contrato));
+
+        assertEquals("Sala já possui um contrato ativo no período informado.", exception.getMessage());
+    }
+
+    @Test
     void updateThrowsWhenNotFound() {
         Contrato contrato = sampleContrato();
         when(repo.existsById(1L)).thenReturn(false);
@@ -118,6 +165,7 @@ class ContratoServiceTest {
     @Test
     void deleteRemovesExistingContrato() {
         when(repo.existsById(1L)).thenReturn(true);
+        when(repo.findById(1L)).thenReturn(Optional.of(sampleContrato()));
         doNothing().when(repo).deleteById(1L);
 
         service.delete(1L);

@@ -18,6 +18,8 @@ import { dateBrToIso, isoToDateBr, maskCurrency, onlyDigits, parseCurrency } fro
 import { clearSession, getToken, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVACAO' | 'CANCELADO';
+type SortDirection = 'asc' | 'desc';
+type ContratoSortKey = 'sala' | 'locatario' | 'periodo' | 'valor' | 'vencimento' | 'status';
 
 type Sala = {
   id: number;
@@ -90,6 +92,10 @@ export default function ContratosPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: ContratoSortKey; direction: SortDirection }>({
+    key: 'periodo',
+    direction: 'asc'
+  });
 
   useEffect(() => {
     document.title = 'Gestão de Aluguel - Contratos';
@@ -218,6 +224,59 @@ export default function ContratosPage() {
     setShowModal(false);
     setErro(null);
   };
+
+  const handleSort = (key: ContratoSortKey) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedContratos = [...contratos].sort((a, b) => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const valueA = (() => {
+      switch (sortConfig.key) {
+        case 'sala':
+          return (a.sala?.identificacao || 'Sala não informada').toLowerCase();
+        case 'locatario':
+          return (a.locatario?.nome || 'Locatário não informado').toLowerCase();
+        case 'periodo':
+          return `${a.dataInicio || ''} ${a.dataTermino || ''}`.toLowerCase();
+        case 'valor':
+          return a.valorAluguel;
+        case 'vencimento':
+          return a.diaVencimento;
+        case 'status':
+          return a.status ?? 'ATIVO';
+        default:
+          return '';
+      }
+    })();
+    const valueB = (() => {
+      switch (sortConfig.key) {
+        case 'sala':
+          return (b.sala?.identificacao || 'Sala não informada').toLowerCase();
+        case 'locatario':
+          return (b.locatario?.nome || 'Locatário não informado').toLowerCase();
+        case 'periodo':
+          return `${b.dataInicio || ''} ${b.dataTermino || ''}`.toLowerCase();
+        case 'valor':
+          return b.valorAluguel;
+        case 'vencimento':
+          return b.diaVencimento;
+        case 'status':
+          return b.status ?? 'ATIVO';
+        default:
+          return '';
+      }
+    })();
+
+    if (typeof valueA === 'number' && typeof valueB === 'number') {
+      return (valueA - valueB) * direction;
+    }
+
+    return String(valueA).localeCompare(String(valueB)) * direction;
+  });
 
   if (!isLoggedIn) {
     return <div className='alert-card'>Redirecionando para login...</div>;
@@ -454,13 +513,37 @@ export default function ContratosPage() {
         <table className='table'>
           <thead>
             <tr>
-              <th>Sala</th>
-              <th>Locatário</th>
-              <th>Período</th>
-              <th>Valor</th>
-              <th>Vencimento</th>
+              <th>
+                <button type='button' onClick={() => handleSort('sala')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Sala {sortConfig.key === 'sala' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('locatario')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Locatário {sortConfig.key === 'locatario' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('periodo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Período {sortConfig.key === 'periodo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('valor')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Valor {sortConfig.key === 'valor' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
+              <th>
+                <button type='button' onClick={() => handleSort('vencimento')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Vencimento {sortConfig.key === 'vencimento' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Contrato</th>
-              <th>Status</th>
+              <th>
+                <button type='button' onClick={() => handleSort('status')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
+                  Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -472,7 +555,7 @@ export default function ContratosPage() {
                 </td>
               </tr>
             ) : (
-              contratos.map((item) => (
+              sortedContratos.map((item) => (
                 <tr key={item.id}>
                   <td>{item.sala?.identificacao || 'Sala não informada'}</td>
                   <td>{item.locatario?.nome || 'Locatário não informado'}</td>

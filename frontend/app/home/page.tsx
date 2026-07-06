@@ -44,6 +44,8 @@ type Contrato = {
   dataTermino?: string;
   status?: string;
   diaVencimento?: number;
+  emDia?: boolean;
+  situacao?: string;
   sala?: {
     identificacao?: string;
     terreno?: { endereco?: string; numero?: string };
@@ -78,7 +80,7 @@ export default function Home() {
   const [novaCobranca, setNovaCobranca] = useState<Partial<Cobranca>>({
     mes: new Date().getMonth() + 1,
     ano: new Date().getFullYear(),
-    status: 'PENDENTE'
+    status: 'PAGO'
   });
   const [carregandoCobrancas, setCarregandoCobrancas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -139,13 +141,13 @@ export default function Home() {
     setNovaCobranca({
       mes: new Date().getMonth() + 1,
       ano: new Date().getFullYear(),
-      status: 'PENDENTE'
+      status: 'PAGO'
     });
     carregarCobrancas(contrato.id);
   };
 
   const registrarPagamento = async () => {
-    if (!contratoSelecionado || !novaCobranca.status || !novaCobranca.mes || !novaCobranca.ano) {
+    if (!contratoSelecionado || !novaCobranca.mes || !novaCobranca.ano) {
       setErro('Preencha todos os campos obrigatórios.');
       return;
     }
@@ -155,20 +157,20 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: novaCobranca.status,
+          status: 'PAGO',
           valor: novaCobranca.valor || contratoSelecionado.valorAluguel,
-          dataPagamento: novaCobranca.dataPagamento,
+          dataPagamento: novaCobranca.dataPagamento || new Date().toISOString().slice(0, 10),
           observacoes: novaCobranca.observacoes
         })
       });
 
       if (!response.ok) throw new Error('Erro ao registrar pagamento');
 
-      await carregarCobrancas(contratoSelecionado.id);
+      await Promise.all([carregarCobrancas(contratoSelecionado.id), carregarDados()]);
       setNovaCobranca({
         mes: new Date().getMonth() + 1,
         ano: new Date().getFullYear(),
-        status: 'PENDENTE'
+        status: 'PAGO'
       });
       setErro(null);
     } catch (err) {
@@ -201,30 +203,17 @@ export default function Home() {
     }
   };
 
-  const verificarAtraso = (contrato: Contrato) => {
-    if (!contrato.diaVencimento || !contrato.dataInicio) return false;
-    const hoje = new Date();
-    const diaAtual = hoje.getDate();
-    const mesAtual = hoje.getMonth();
-    const anoAtual = hoje.getFullYear();
-    const dataInicio = new Date(contrato.dataInicio);
-    let mesVencimento = dataInicio.getMonth();
-    let anoVencimento = dataInicio.getFullYear();
-    if (diaAtual > contrato.diaVencimento) {
-      mesVencimento = mesAtual + 1;
-      anoVencimento = anoAtual;
-      if (mesVencimento > 11) {
-        mesVencimento = 0;
-        anoVencimento = anoAtual + 1;
-      }
-    } else {
-      mesVencimento = mesAtual;
-      anoVencimento = anoAtual;
+  const getSituacaoContrato = (contrato: Contrato) => {
+    if (contrato.situacao === 'EM_DIA') {
+      return { label: 'Em dia', className: 'badge badge-success' };
     }
-    const dataVencimento = new Date(anoVencimento, mesVencimento, contrato.diaVencimento);
-    const diffDays = Math.ceil((hoje.getTime() - dataVencimento.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays > 0;
+    if (contrato.situacao === 'EM_ATRASO') {
+      return { label: 'Em atraso', className: 'badge badge-danger' };
+    }
+    return { label: 'Em aberto', className: 'badge badge-warning' };
   };
+
+  const verificarAtraso = (contrato: Contrato) => getSituacaoContrato(contrato).label === 'Em atraso';
 
   const contratosEmAtraso = contratos.filter(verificarAtraso);
   const contratosAtivos = contratos.filter((c) => c.status === 'ATIVO');
@@ -435,19 +424,6 @@ export default function Home() {
                   </select>
                 </div>
                 <div className='form-group'>
-                  <label htmlFor='status'>Status</label>
-                  <select
-                    id='status'
-                    value={novaCobranca.status || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, status: e.target.value as Cobranca['status'] })}
-                  >
-                    <option value='PENDENTE'>Pendente</option>
-                    <option value='PAGO'>Pago</option>
-                    <option value='INADIMPLENTE'>Inadimplente</option>
-                    <option value='CANCELADO'>Cancelado</option>
-                  </select>
-                </div>
-                <div className='form-group'>
                   <label htmlFor='valor'>Valor</label>
                   <input
                     id='valor'
@@ -535,8 +511,6 @@ export default function Home() {
             ))}
           </ul>
         </div>
-
-
       <section className='card'>
         <h2>Vencimentos dos aluguéis ({contratos.length})</h2>
         <table className='table'>
@@ -561,7 +535,7 @@ export default function Home() {
               </tr>
             ) : (
               contratos.map((contrato) => {
-                const emAtraso = verificarAtraso(contrato);
+                const situacao = getSituacaoContrato(contrato);
                 return (
                   <tr key={contrato.id}>
                     <td>{contrato.locatario?.nome || '—'}</td>
@@ -571,9 +545,7 @@ export default function Home() {
                     <td>Dia {contrato.diaVencimento ?? '—'}</td>
                     <td>{labelStatusContrato(contrato.status)}</td>
                     <td>
-                      <span className={emAtraso ? 'badge badge-danger' : 'badge badge-success'}>
-                        {emAtraso ? 'Em atraso' : 'Em dia'}
-                      </span>
+                      <span className={situacao.className}>{situacao.label}</span>
                     </td>
                     <td>
                       <button

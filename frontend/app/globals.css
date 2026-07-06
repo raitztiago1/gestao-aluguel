@@ -357,8 +357,8 @@ body {
 }
 
 .summary-card-highlight {
-  border-color: #0f62fe;
-  background: linear-gradient(180deg, #f0f5ff 0%, #e8efff 100%);
+  border-color: #3D3D3D;
+  background: linear-gradient(180deg, #f5f5f5 0%, #ececec 100%);
 }
 
 .summary-label {
@@ -378,7 +378,7 @@ body {
 
 .summary-card .button-link {
   justify-self: start;
-  color: #0f62fe;
+  color: #3D3D3D;
 }
 
 .modal-backdrop {
@@ -693,6 +693,7 @@ label {
   background: #fff8e6;
   border-color: #ffdfb6;
   color: #664d03;
+  margin-top: 1.5rem;
 }
 
 .badge {
