@@ -436,10 +436,7 @@ export default function Home() {
 
   return (
     <main className='container'>
-      <AppHeader
-        title='Painel'
-        subtitle='Visão geral dos terrenos, salas, contratos ativos e vencimentos de aluguel.'
-      />
+      <AppHeader />
 
       {carregando && <div className='alert-card'>Carregando dados...</div>}
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}

@@ -1,7 +1,10 @@
 package com.felicioecavalaro.gestao_aluguel.service;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusCobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusSala;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
 import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
@@ -21,6 +25,11 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ContratoService {
+
+    private static final List<StatusContrato> ACTIVE_STATUSES = List.of(
+            StatusContrato.ATIVO,
+            StatusContrato.RENOVADO);
+
     private final ContratoRepository repo;
     private final SalaRepository salaRepository;
     private final CobrancaRepository cobrancaRepository;
@@ -115,35 +124,73 @@ public class ContratoService {
             return "EM_ABERTO";
         }
 
-        if (contrato.getStatus() != StatusContrato.ATIVO) {
+        if (contrato.getStatus() == null || !ACTIVE_STATUSES.contains(contrato.getStatus())) {
             return "EM_ABERTO";
         }
 
         LocalDate hoje = LocalDate.now();
-        if (contrato.getDataInicio() != null && hoje.isBefore(contrato.getDataInicio())) {
+        if (contrato.getDataInicio() == null || contrato.getDataTermino() == null) {
             return "EM_ABERTO";
         }
-        if (contrato.getDataTermino() != null && hoje.isAfter(contrato.getDataTermino())) {
+        if (hoje.isBefore(contrato.getDataInicio())) {
+            return "EM_ABERTO";
+        }
+        if (hoje.isAfter(contrato.getDataTermino())) {
             return "EM_ABERTO";
         }
 
-        int ano = hoje.getYear();
-        int mes = hoje.getMonthValue();
-        int diaVencimento = contrato.getDiaVencimento();
-        int ultimoDiaDoMes = hoje.withDayOfMonth(hoje.lengthOfMonth()).getDayOfMonth();
-        int diaLimite = Math.min(diaVencimento, ultimoDiaDoMes);
-        LocalDate dataLimite = LocalDate.of(ano, mes, diaLimite);
+        YearMonth mesAtual = YearMonth.from(hoje);
+        YearMonth inicio = YearMonth.from(contrato.getDataInicio());
+        YearMonth fim = YearMonth.from(contrato.getDataTermino());
+        YearMonth limite = mesAtual.isBefore(fim) ? mesAtual : fim;
 
-        boolean pagoNoMes = cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(contrato.getId()).stream()
-                .filter(cobranca -> cobranca.getStatus() == StatusCobranca.PAGO)
+        Map<YearMonth, Cobranca> cobrancasPorMes = cobrancaRepository
+                .findAllByContratoIdOrderByAnoDescMesDesc(contrato.getId()).stream()
                 .filter(cobranca -> cobranca.getAno() != null && cobranca.getMes() != null)
-                .anyMatch(cobranca -> cobranca.getAno().equals(ano) && cobranca.getMes().equals(mes));
+                .collect(Collectors.toMap(
+                        cobranca -> YearMonth.of(cobranca.getAno(), cobranca.getMes()),
+                        cobranca -> cobranca,
+                        (existing, replacement) -> existing));
 
-        if (pagoNoMes) {
-            return "EM_DIA";
+        boolean temAtraso = false;
+        boolean temAberto = false;
+
+        for (YearMonth mes = inicio; !mes.isAfter(limite); mes = mes.plusMonths(1)) {
+            Cobranca cobranca = cobrancasPorMes.get(mes);
+            if (cobranca != null && cobranca.getStatus() == StatusCobranca.PAGO) {
+                continue;
+            }
+
+            LocalDate dataLimite = calcularDataLimitePagamento(contrato, mes);
+            if (hoje.isAfter(dataLimite)) {
+                temAtraso = true;
+            } else {
+                temAberto = true;
+            }
         }
 
-        return hoje.isAfter(dataLimite) ? "EM_ATRASO" : "EM_ABERTO";
+        if (temAtraso) {
+            return "EM_ATRASO";
+        }
+        if (temAberto) {
+            return "EM_ABERTO";
+        }
+        return "EM_DIA";
+    }
+
+    private LocalDate calcularDataLimitePagamento(Contrato contrato, YearMonth mesReferencia) {
+        int diaVencimento = contrato.getDiaVencimento();
+        int diaLimite = Math.min(diaVencimento, mesReferencia.lengthOfMonth());
+        LocalDate dataLimite = mesReferencia.atDay(diaLimite);
+
+        YearMonth mesInicioContrato = YearMonth.from(contrato.getDataInicio());
+        if (mesReferencia.equals(mesInicioContrato) && dataLimite.isBefore(contrato.getDataInicio())) {
+            YearMonth proximoMes = mesReferencia.plusMonths(1);
+            int diaNoProximoMes = Math.min(diaVencimento, proximoMes.lengthOfMonth());
+            return proximoMes.atDay(diaNoProximoMes);
+        }
+
+        return dataLimite;
     }
 
     private void syncSalaStatus(Contrato contrato) {

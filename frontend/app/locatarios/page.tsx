@@ -320,10 +320,7 @@ export default function LocatariosPage() {
 
   return (
     <main className='container'>
-      <AppHeader
-        title='Locatários'
-        subtitle='Cadastre pessoas físicas ou jurídicas com contato e endereço completos.'
-      />
+      <AppHeader />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}

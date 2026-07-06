@@ -18,12 +18,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 type AppHeaderProps = {
-  title: string;
-  subtitle?: string;
   showLogout?: boolean;
 };
 
-export default function AppHeader({ title, subtitle, showLogout = true }: AppHeaderProps) {
+export default function AppHeader({ showLogout = true }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -32,32 +30,15 @@ export default function AppHeader({ title, subtitle, showLogout = true }: AppHea
     router.push('/login');
   };
 
-  const breadcrumb =
-    pathname === '/home'
-      ? [{ label: 'Painel', href: '/home' }]
-      : [
-          { label: 'Início', href: '/home' },
-          { label: title, href: pathname }
-        ];
-
   return (
     <header className='app-header'>
       <div className='app-topbar'>
-        <Link href='/home' className='app-brand' aria-label='Ir para o painel inicial'>
-          <span className='app-brand-icon' aria-hidden='true'>
-            <svg width='22' height='22' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
-              <path
-                d='M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z'
-                stroke='currentColor'
-                strokeWidth='1.8'
-                strokeLinejoin='round'
-              />
-            </svg>
-          </span>
-          <span className='app-brand-text'>
-            <span className='app-brand-name'>Gestão de Aluguel</span>
-            <span className='app-brand-tagline'>Holding imobiliária</span>
-          </span>
+        <Link href='/home' className='app-brand' aria-label='Felicio e Raitz - Ir para o painel inicial'>
+          <img
+            src='/logo-holding.png'
+            alt='Felicio e Raitz Holding Imobiliária'
+            className='app-brand-logo'
+          />
         </Link>
 
         <nav className='app-nav' aria-label='Navegação principal'>
@@ -90,23 +71,6 @@ export default function AppHeader({ title, subtitle, showLogout = true }: AppHea
             Sair
           </button>
         )}
-      </div>
-
-      <div className='app-hero'>
-        <nav className='app-breadcrumb' aria-label='Você está em'>
-          {breadcrumb.map((item, index) => (
-            <span key={item.href} className='app-breadcrumb-item'>
-              {index > 0 && <span className='app-breadcrumb-separator' aria-hidden='true'>/</span>}
-              {index === breadcrumb.length - 1 ? (
-                <span className='app-breadcrumb-current'>{item.label}</span>
-              ) : (
-                <Link href={item.href}>{item.label}</Link>
-              )}
-            </span>
-          ))}
-        </nav>
-        <h1 className='app-hero-title'>{title}</h1>
-        {subtitle && <p className='app-hero-subtitle'>{subtitle}</p>}
       </div>
     </header>
   );

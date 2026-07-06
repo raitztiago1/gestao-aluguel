@@ -279,7 +279,7 @@ export default function ContratosPage() {
 
   return (
     <main className='container'>
-      <AppHeader title='Contratos' subtitle='Associe salas e locatários, defina prazos e valores de aluguel.' />
+      <AppHeader />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}

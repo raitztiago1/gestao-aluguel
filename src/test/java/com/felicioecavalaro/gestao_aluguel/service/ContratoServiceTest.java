@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -96,6 +97,9 @@ class ContratoServiceTest {
         int diaVencimento = Math.min(hoje.getDayOfMonth() + 1, hoje.lengthOfMonth());
         Contrato contrato = Contrato.builder()
                 .id(1L)
+                .status(StatusContrato.ATIVO)
+                .dataInicio(hoje.withDayOfMonth(1))
+                .dataTermino(hoje.plusMonths(6))
                 .diaVencimento(diaVencimento)
                 .build();
 
@@ -108,17 +112,80 @@ class ContratoServiceTest {
     }
 
     @Test
-    void findAllMarksContratoAsEmDiaWhenCurrentMonthIsPaidAfterDueDate() {
+    void findAllMarksContratoAsEmDiaWhenAllPayableMonthsArePaid() {
         LocalDate hoje = LocalDate.now();
         int diaVencimento = Math.max(1, hoje.getDayOfMonth() - 1);
+        LocalDate dataInicio = hoje.minusMonths(3).withDayOfMonth(1);
         Contrato contrato = Contrato.builder()
                 .id(1L)
                 .status(StatusContrato.ATIVO)
-                .dataInicio(hoje.minusMonths(1))
-                .dataTermino(hoje.plusMonths(1))
+                .dataInicio(dataInicio)
+                .dataTermino(hoje.plusMonths(6))
                 .diaVencimento(diaVencimento)
                 .build();
-        Cobranca cobranca = Cobranca.builder()
+
+        List<Cobranca> cobrancas = new java.util.ArrayList<>();
+        YearMonth inicio = YearMonth.from(dataInicio);
+        YearMonth limite = YearMonth.from(hoje);
+        for (YearMonth mes = inicio; !mes.isAfter(limite); mes = mes.plusMonths(1)) {
+            cobrancas.add(Cobranca.builder()
+                    .ano(mes.getYear())
+                    .mes(mes.getMonthValue())
+                    .status(StatusCobranca.PAGO)
+                    .dataPagamento(hoje)
+                    .build());
+        }
+
+        when(repo.findAll()).thenReturn(List.of(contrato));
+        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(cobrancas);
+
+        List<Contrato> result = service.findAll();
+
+        assertEquals("EM_DIA", result.get(0).getSituacao());
+    }
+
+    @Test
+    void findAllMarksContratoAsEmDiaWhenStartMonthDueDateIsBeforeContractStartAndPaymentExists() {
+        LocalDate hoje = LocalDate.of(2026, 7, 20);
+        try (var mockedLocalDate = org.mockito.Mockito.mockStatic(LocalDate.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+            mockedLocalDate.when(LocalDate::now).thenReturn(hoje);
+
+            Contrato contrato = Contrato.builder()
+                    .id(1L)
+                    .status(StatusContrato.ATIVO)
+                    .dataInicio(LocalDate.of(2026, 7, 15))
+                    .dataTermino(LocalDate.of(2027, 7, 14))
+                    .diaVencimento(5)
+                    .build();
+            Cobranca cobranca = Cobranca.builder()
+                    .ano(2026)
+                    .mes(7)
+                    .status(StatusCobranca.PAGO)
+                    .dataPagamento(hoje)
+                    .build();
+
+            when(repo.findAll()).thenReturn(List.of(contrato));
+            when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(List.of(cobranca));
+
+            List<Contrato> result = service.findAll();
+
+            assertEquals("EM_DIA", result.get(0).getSituacao());
+        }
+    }
+
+    @Test
+    void findAllMarksContratoAsEmAtrasoWhenPastMonthIsUnpaid() {
+        LocalDate hoje = LocalDate.now();
+        int diaVencimento = Math.max(1, hoje.getDayOfMonth() - 1);
+        YearMonth mesAnterior = YearMonth.from(hoje).minusMonths(1);
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .status(StatusContrato.ATIVO)
+                .dataInicio(mesAnterior.atDay(1))
+                .dataTermino(hoje.plusMonths(6))
+                .diaVencimento(diaVencimento)
+                .build();
+        Cobranca cobrancaAtual = Cobranca.builder()
                 .ano(hoje.getYear())
                 .mes(hoje.getMonthValue())
                 .status(StatusCobranca.PAGO)
@@ -126,7 +193,42 @@ class ContratoServiceTest {
                 .build();
 
         when(repo.findAll()).thenReturn(List.of(contrato));
-        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(List.of(cobranca));
+        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(List.of(cobrancaAtual));
+
+        List<Contrato> result = service.findAll();
+
+        assertEquals("EM_ATRASO", result.get(0).getSituacao());
+    }
+
+    @Test
+    void findAllMarksContratoAsEmDiaWhenCurrentMonthIsPaidAfterDueDate() {
+        LocalDate hoje = LocalDate.now();
+        int diaVencimento = Math.max(1, hoje.getDayOfMonth() - 1);
+        LocalDate dataInicio = hoje.minusMonths(1).withDayOfMonth(1);
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .status(StatusContrato.ATIVO)
+                .dataInicio(dataInicio)
+                .dataTermino(hoje.plusMonths(1))
+                .diaVencimento(diaVencimento)
+                .build();
+        YearMonth mesAnterior = YearMonth.from(hoje).minusMonths(1);
+        List<Cobranca> cobrancas = List.of(
+                Cobranca.builder()
+                        .ano(mesAnterior.getYear())
+                        .mes(mesAnterior.getMonthValue())
+                        .status(StatusCobranca.PAGO)
+                        .dataPagamento(hoje)
+                        .build(),
+                Cobranca.builder()
+                        .ano(hoje.getYear())
+                        .mes(hoje.getMonthValue())
+                        .status(StatusCobranca.PAGO)
+                        .dataPagamento(hoje)
+                        .build());
+
+        when(repo.findAll()).thenReturn(List.of(contrato));
+        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(cobrancas);
 
         List<Contrato> result = service.findAll();
 

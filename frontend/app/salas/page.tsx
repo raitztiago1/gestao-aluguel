@@ -213,7 +213,7 @@ export default function SalasPage() {
 
   return (
     <main className='container'>
-      <AppHeader title='Salas' subtitle='Cadastre salas e vincule-as aos terrenos.' />
+      <AppHeader />
 
       <div className='page-toolbar'>
         <h2>Salas cadastradas ({salas.length})</h2>

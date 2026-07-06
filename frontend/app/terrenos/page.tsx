@@ -250,10 +250,7 @@ export default function TerrenosPage() {
 
   return (
     <main className='container'>
-      <AppHeader
-        title='Terrenos'
-        subtitle='Cadastre imóveis comerciais ou residenciais com endereço e metragem.'
-      />
+      <AppHeader />
 
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
