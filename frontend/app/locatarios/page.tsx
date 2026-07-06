@@ -1,22 +1,21 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
 import { useCepLookup } from '../hooks/useCepLookup';
+import { useAuthGuard } from '../hooks/useAuth';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
-  formatAddressLine,
-  formatCpfCnpjDisplay,
-  formatPhoneDisplay,
-  labelTipoPessoa
+    formatAddressLine,
+    formatCpfCnpjDisplay,
+    formatPhoneDisplay,
+    labelTipoPessoa
 } from '../lib/format';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../lib/masks';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoPessoa = 'FISICA' | 'JURIDICA';
 type SortDirection = 'asc' | 'desc';
@@ -96,8 +95,7 @@ function locatarioToForm(loc: Locatario): LocatarioForm {
 }
 
 export default function LocatariosPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [locatarios, setLocatarios] = useState<Locatario[]>([]);
   const [formLocatario, setFormLocatario] = useState<LocatarioForm>(defaultLocatarioForm);
   const [modoEdicao, setModoEdicao] = useState(false);
@@ -123,16 +121,11 @@ export default function LocatariosPage() {
   }, []);
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-    setIsLoggedIn(true);
     carregarDados();
-    const cleanup = setupUnloadLogout();
-    return cleanup;
-  }, [router]);
+  }, [authStatus]);
 
   // Helper function to validate CPF
   const isValidCpf = (cpf: string): boolean => {
@@ -321,7 +314,7 @@ export default function LocatariosPage() {
     return String(valueA).localeCompare(String(valueB)) * direction;
   });
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
 

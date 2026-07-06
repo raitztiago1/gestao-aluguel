@@ -69,12 +69,10 @@ public class TerrenoService {
             if (terreno.getQuantidadeSalas() == null) {
                 throw new IllegalArgumentException("Quantidade de salas é obrigatória para terreno comercial");
             }
-            if (terreno.getMetragemSalas() == null) {
-                throw new IllegalArgumentException("Metragem de salas é obrigatória para terreno comercial");
-            }
             if (terreno.getMetragemCasa() != null) {
                 throw new IllegalArgumentException("Metragem de casa não deve ser informada para terreno comercial");
             }
+            terreno.setMetragemSalas(null);
         } else if (terreno.getTipo() == TipoTerreno.RESIDENCIAL) {
             if (terreno.getMetragemCasa() == null) {
                 throw new IllegalArgumentException("Metragem de casa é obrigatória para terreno residencial");

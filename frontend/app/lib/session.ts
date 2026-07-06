@@ -28,6 +28,46 @@ function getCookie(name: string): string | null {
   return parts ? decodeURIComponent(parts.split('=').slice(1).join('=')) : null;
 }
 
+function getSessionToken(): string | null {
+  return localStorage.getItem('token') || getCookie(AUTH_COOKIE_NAME);
+}
+
+function getSessionExpiry(): number {
+  const fromStorage = Number(localStorage.getItem('sessionExpiresAt') || 0);
+  const fromCookie = Number(getCookie(AUTH_EXPIRES_COOKIE_NAME) || 0);
+  return Math.max(fromStorage, fromCookie);
+}
+
+/** Mantém localStorage e cookies alinhados para sobreviver ao F5 e ao middleware. */
+export function syncSession() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const token = getSessionToken();
+  const expiresAt = getSessionExpiry();
+
+  if (!token || !expiresAt || expiresAt <= Date.now()) {
+    return;
+  }
+
+  const remainingSeconds = Math.max(Math.floor((expiresAt - Date.now()) / 1000), 0);
+
+  if (!localStorage.getItem('token')) {
+    localStorage.setItem('token', token);
+  }
+  if (!localStorage.getItem('sessionExpiresAt')) {
+    localStorage.setItem('sessionExpiresAt', String(expiresAt));
+  }
+
+  if (getCookie(AUTH_COOKIE_NAME) !== token) {
+    setCookie(AUTH_COOKIE_NAME, token, remainingSeconds);
+  }
+  if (getCookie(AUTH_EXPIRES_COOKIE_NAME) !== String(expiresAt)) {
+    setCookie(AUTH_EXPIRES_COOKIE_NAME, String(expiresAt), remainingSeconds);
+  }
+}
+
 export function createSession(userData: UserSession) {
   const expiresAt = String(Date.now() + SESSION_TIMEOUT_MS);
   localStorage.setItem('token', userData.token);
@@ -50,13 +90,24 @@ export function clearSession() {
 }
 
 export function isSessionValid() {
-  const token = localStorage.getItem('token') || getCookie(AUTH_COOKIE_NAME);
-  const expiresAt = Number(localStorage.getItem('sessionExpiresAt') || getCookie(AUTH_EXPIRES_COOKIE_NAME));
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  syncSession();
+
+  const token = getSessionToken();
+  const expiresAt = getSessionExpiry();
   return !!token && expiresAt > Date.now();
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem('token');
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  syncSession();
+  return getSessionToken();
 }
 
 export function getUserData(): UserSession | null {
@@ -78,9 +129,5 @@ export function getUserData(): UserSession | null {
 }
 
 export function setupUnloadLogout() {
-  const handler = () => {
-    clearSession();
-  };
-  window.addEventListener('beforeunload', handler);
-  return () => window.removeEventListener('beforeunload', handler);
+  return () => {};
 }

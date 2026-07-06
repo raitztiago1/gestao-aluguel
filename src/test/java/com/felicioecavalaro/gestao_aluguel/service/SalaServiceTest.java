@@ -100,9 +100,42 @@ class SalaServiceTest {
         when(terrenoRepository.findById(10L)).thenReturn(Optional.of(terreno));
         when(repo.findAll()).thenReturn(List.of(existingSala));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> service.create(newSala));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> service.create(newSala));
 
         assertEquals("Terreno residencial já possui uma sala cadastrada", exception.getMessage());
+        verify(repo).findAll();
+    }
+
+    @Test
+    void createThrowsWhenSameTerrenoAlreadyHasSalaWithSameIdentificacao() {
+        Terreno terreno = Terreno.builder().id(10L).tipo(TipoTerreno.COMERCIAL).quantidadeSalas(4).build();
+        Sala existingSala = Sala.builder().id(99L).identificacao("Sala 01").terreno(terreno).build();
+        Sala newSala = Sala.builder().identificacao("sala 01").terreno(terreno).build();
+
+        when(terrenoRepository.findById(10L)).thenReturn(Optional.of(terreno));
+        when(repo.findAll()).thenReturn(List.of(existingSala));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> service.create(newSala));
+
+        assertEquals("Já existe uma sala com esta identificação neste terreno", exception.getMessage());
+        verify(repo).findAll();
+    }
+
+    @Test
+    void createThrowsWhenCommercialTerrenoReachedSalaLimit() {
+        Terreno terreno = Terreno.builder().id(10L).tipo(TipoTerreno.COMERCIAL).quantidadeSalas(1).build();
+        Sala existingSala = Sala.builder().id(99L).identificacao("Sala 01").terreno(terreno).build();
+        Sala newSala = Sala.builder().identificacao("Sala 02").terreno(terreno).build();
+
+        when(terrenoRepository.findById(10L)).thenReturn(Optional.of(terreno));
+        when(repo.findAll()).thenReturn(List.of(existingSala));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> service.create(newSala));
+
+        assertEquals("Quantidade máxima de salas para este terreno já foi atingida", exception.getMessage());
         verify(repo).findAll();
     }
 

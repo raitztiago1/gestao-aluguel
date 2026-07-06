@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import ErrorAlert from '../components/ErrorAlert';
+import { useAuthGuard } from '../hooks/useAuth';
 import { fetchJson, getApiBaseUrl, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -15,7 +16,6 @@ import {
   labelStatusSala,
   labelTipoTerreno
 } from '../lib/format';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
 
@@ -89,7 +89,6 @@ function formatTerrenoForm(form: TerrenoForm) {
     metragemTotal: form.metragemTotal ? Number(form.metragemTotal) : undefined,
     vagasGaragem: form.vagasGaragem ? Number(form.vagasGaragem) : undefined,
     quantidadeSalas: form.quantidadeSalas ? Number(form.quantidadeSalas) : undefined,
-    metragemSalas: form.metragemSalas ? Number(form.metragemSalas) : undefined,
     metragemCasa: form.metragemCasa ? Number(form.metragemCasa) : undefined,
     observacoes: form.observacoes || undefined
   };
@@ -98,7 +97,7 @@ function formatTerrenoForm(form: TerrenoForm) {
 
 export default function CRUD() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [terrenos, setTerrenos] = useState<Terreno[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
   const [locatarios, setLocatarios] = useState<Locatario[]>([]);
@@ -158,17 +157,11 @@ export default function CRUD() {
   };
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-
-    setIsLoggedIn(true);
     carregarDados();
-    const cleanup = setupUnloadLogout();
-    return cleanup;
-  }, [router]);
+  }, [authStatus]);
 
   const carregarDados = async () => {
     try {
@@ -249,7 +242,7 @@ export default function CRUD() {
     router.push('/home');
   };
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div>Redirecionando para login...</div>;
   }
 
@@ -414,18 +407,6 @@ export default function CRUD() {
                   required
                 />
               </div>
-              <div className='form-group'>
-                <label>Metragem salas <span className='required-star'>*</span></label>
-                <input
-                  className={`input-field${fieldMissing(formTerreno.metragemSalas) ? ' invalid' : ''}`}
-                  type='number'
-                  step='0.01'
-                  min='0'
-                  value={formTerreno.metragemSalas}
-                  onChange={(e) => setFormTerreno((s) => ({ ...s, metragemSalas: e.target.value }))}
-                  required
-                />
-              </div>
             </div>
           )}
 
@@ -490,7 +471,7 @@ export default function CRUD() {
                 <td>{formatArea(terreno.metragemTotal)}</td>
                 <td>
                   {terreno.tipo === 'COMERCIAL'
-                    ? `Vagas: ${terreno.vagasGaragem ?? '—'} • Salas: ${terreno.quantidadeSalas ?? '—'} • Metragem salas: ${terreno.metragemSalas ?? '—'}`
+                    ? `Vagas: ${terreno.vagasGaragem ?? '—'} • Salas: ${terreno.quantidadeSalas ?? '—'}`
                     : `Metragem casa: ${terreno.metragemCasa ?? '—'}`}
                 </td>
                 <td className='table-actions'>

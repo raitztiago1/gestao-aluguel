@@ -2,7 +2,6 @@ package com.felicioecavalaro.gestao_aluguel.service;
 
 import java.util.List;
 
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
@@ -14,6 +13,7 @@ import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.TerrenoRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -36,7 +36,7 @@ public class SalaService {
     }
 
     public Sala create(Sala sala) {
-        validarRestricaoTerrenoResidencial(sala.getTerreno(), null);
+        validarRegrasTerreno(sala, null);
         Sala saved = repo.save(sala);
         syncStatus(saved);
         return saved;
@@ -46,7 +46,7 @@ public class SalaService {
         if (!repo.existsById(id)) {
             throw new EntityNotFoundException("Sala não encontrada: " + id);
         }
-        validarRestricaoTerrenoResidencial(sala.getTerreno(), id);
+        validarRegrasTerreno(sala, id);
         sala.setId(id);
         Sala saved = repo.save(sala);
         syncStatus(saved);
@@ -60,24 +60,41 @@ public class SalaService {
         repo.deleteById(id);
     }
 
-    private void validarRestricaoTerrenoResidencial(Terreno terreno, Long currentSalaId) {
+    private void validarRegrasTerreno(Sala sala, Long currentSalaId) {
+        Terreno terreno = sala.getTerreno();
         if (terreno == null || terreno.getId() == null) {
             return;
         }
 
         Terreno terrenoPersistido = terrenoRepository.findById(terreno.getId()).orElse(null);
-        if (terrenoPersistido == null || terrenoPersistido.getTipo() != TipoTerreno.RESIDENCIAL) {
+        if (terrenoPersistido == null) {
             return;
         }
 
-        boolean alreadyHasSala = repo.findAll().stream()
+        List<Sala> outrasSalasDoTerreno = repo.findAll().stream()
                 .filter(existingSala -> existingSala.getId() == null || !existingSala.getId().equals(currentSalaId))
-                .anyMatch(existingSala -> existingSala.getTerreno() != null
+                .filter(existingSala -> existingSala.getTerreno() != null
                         && existingSala.getTerreno().getId() != null
-                        && existingSala.getTerreno().getId().equals(terreno.getId()));
+                        && existingSala.getTerreno().getId().equals(terreno.getId()))
+                .toList();
 
-        if (alreadyHasSala) {
+        String identificacao = sala.getIdentificacao() == null ? "" : sala.getIdentificacao().trim();
+        boolean identificacaoDuplicada = outrasSalasDoTerreno.stream()
+                .anyMatch(existingSala -> existingSala.getIdentificacao() != null
+                        && existingSala.getIdentificacao().trim().equalsIgnoreCase(identificacao));
+
+        if (!identificacao.isBlank() && identificacaoDuplicada) {
+            throw new IllegalArgumentException("Já existe uma sala com esta identificação neste terreno");
+        }
+
+        if (terrenoPersistido.getTipo() == TipoTerreno.RESIDENCIAL && !outrasSalasDoTerreno.isEmpty()) {
             throw new IllegalArgumentException("Terreno residencial já possui uma sala cadastrada");
+        }
+
+        if (terrenoPersistido.getTipo() == TipoTerreno.COMERCIAL
+                && terrenoPersistido.getQuantidadeSalas() != null
+                && outrasSalasDoTerreno.size() >= terrenoPersistido.getQuantidadeSalas()) {
+            throw new IllegalArgumentException("Quantidade máxima de salas para este terreno já foi atingida");
         }
     }
 
@@ -87,7 +104,8 @@ public class SalaService {
         }
         boolean occupied = contratoRepository.findBySalaId(sala.getId()).stream()
                 .filter(contrato -> contrato.getDataInicio() != null && contrato.getDataTermino() != null)
-                .filter(contrato -> contrato.getStatus() == StatusContrato.ATIVO || contrato.getStatus() == StatusContrato.RENOVADO)
+                .filter(contrato -> contrato.getStatus() == StatusContrato.ATIVO
+                        || contrato.getStatus() == StatusContrato.RENOVADO)
                 .anyMatch(contrato -> !java.time.LocalDate.now().isBefore(contrato.getDataInicio())
                         && !java.time.LocalDate.now().isAfter(contrato.getDataTermino()));
         sala.setStatus(occupied ? StatusSala.LOCADA : StatusSala.DISPONIVEL);

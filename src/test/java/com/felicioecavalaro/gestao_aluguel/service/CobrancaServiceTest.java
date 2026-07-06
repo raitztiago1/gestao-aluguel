@@ -3,6 +3,7 @@ package com.felicioecavalaro.gestao_aluguel.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -136,16 +137,39 @@ class CobrancaServiceTest {
     }
 
     @Test
+    void registerMonthlyStatusThrowsExceptionWhenCobrancaAlreadyExists() {
+        Cobranca existing = sampleCobranca();
+        Cobranca payload = Cobranca.builder()
+                .status(StatusCobranca.PAGO)
+                .valor(BigDecimal.valueOf(1500))
+                .build();
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .valorAluguel(BigDecimal.valueOf(1500))
+                .build();
+
+        when(contratoRepository.findById(1L)).thenReturn(Optional.of(contrato));
+        when(repo.findByContratoIdAndAnoAndMes(1L, 2024, 6)).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class, () -> service.registerMonthlyStatus(1L, 2024, 6, payload));
+        verify(repo, never()).save(any(Cobranca.class));
+    }
+
+    @Test
     void updateSavesExistingCobranca() {
-        Cobranca cobranca = sampleCobranca();
+        Cobranca existing = sampleCobranca();
+        Cobranca payload = Cobranca.builder()
+                .status(StatusCobranca.PAGO)
+                .valor(BigDecimal.valueOf(1600))
+                .build();
 
-        when(contratoRepository.existsById(1L)).thenReturn(true);
-        when(repo.existsById(1L)).thenReturn(true);
-        when(repo.save(any(Cobranca.class))).thenReturn(cobranca);
+        when(repo.findById(1L)).thenReturn(Optional.of(existing));
+        when(repo.save(any(Cobranca.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Cobranca result = service.update(1L, cobranca);
+        Cobranca result = service.update(1L, payload);
 
-        assertEquals(cobranca, result);
+        assertEquals(StatusCobranca.PAGO, result.getStatus());
+        assertEquals(BigDecimal.valueOf(1600), result.getValor());
         verify(repo).save(any(Cobranca.class));
     }
 

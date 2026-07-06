@@ -2,6 +2,7 @@ package com.felicioecavalaro.gestao_aluguel.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -52,13 +53,30 @@ public class CobrancaService {
 
     @Transactional
     public Cobranca update(Long id, Cobranca cobranca) {
-        if (!repo.existsById(id)) {
-            throw new EntityNotFoundException("Cobrança não encontrada: " + id);
+        Cobranca existing = findById(id);
+
+        if (cobranca.getStatus() != null) {
+            existing.setStatus(cobranca.getStatus());
         }
-        validateCobranca(cobranca);
-        cobranca.setId(id);
-        configureAuditFields(cobranca, false);
-        return repo.save(cobranca);
+        if (cobranca.getValor() != null) {
+            existing.setValor(cobranca.getValor());
+        }
+        if (cobranca.getDataPagamento() != null) {
+            existing.setDataPagamento(cobranca.getDataPagamento());
+        }
+        existing.setObservacoes(cobranca.getObservacoes());
+
+        if (existing.getStatus() == StatusCobranca.PAGO && existing.getDataPagamento() == null) {
+            existing.setDataPagamento(LocalDate.now());
+        }
+        if (existing.getStatus() != StatusCobranca.PAGO) {
+            existing.setDataPagamento(null);
+        }
+
+        validatePeriodoContrato(existing.getContrato(), existing.getAno(), existing.getMes());
+        validateDataPagamentoContrato(existing.getContrato(), existing.getDataPagamento());
+        configureAuditFields(existing, false);
+        return repo.save(existing);
     }
 
     @Transactional
@@ -69,17 +87,24 @@ public class CobrancaService {
         Contrato contrato = contratoRepository.findById(contratoId)
                 .orElseThrow(() -> new EntityNotFoundException("Contrato não encontrado: " + contratoId));
 
-        Cobranca cobranca = repo.findByContratoIdAndAnoAndMes(contratoId, ano, mes)
-                .orElseGet(() -> Cobranca.builder()
-                        .contrato(contrato)
-                        .ano(ano)
-                        .mes(mes)
-                        .build());
+        validatePeriodoContrato(contrato, ano, mes);
+
+        if (repo.findByContratoIdAndAnoAndMes(contratoId, ano, mes).isPresent()) {
+            throw new IllegalArgumentException(
+                    "Pagamento ja existe para este contrato no periodo informado. Use a edicao para alterar.");
+        }
+
+        Cobranca cobranca = Cobranca.builder()
+                .contrato(contrato)
+                .ano(ano)
+                .mes(mes)
+                .build();
 
         cobranca.setStatus(payload.getStatus());
         cobranca.setValor(payload.getValor() != null ? payload.getValor() : contrato.getValorAluguel());
         cobranca.setDataPagamento(payload.getDataPagamento() != null ? payload.getDataPagamento()
                 : payload.getStatus() == StatusCobranca.PAGO ? LocalDate.now() : null);
+        validateDataPagamentoContrato(contrato, cobranca.getDataPagamento());
         cobranca.setObservacoes(payload.getObservacoes());
         configureAuditFields(cobranca, cobranca.getId() == null);
         return repo.save(cobranca);
@@ -107,6 +132,35 @@ public class CobrancaService {
         }
         if (!contratoRepository.existsById(cobranca.getContrato().getId())) {
             throw new EntityNotFoundException("Contrato não encontrado: " + cobranca.getContrato().getId());
+        }
+    }
+
+    private void validatePeriodoContrato(Contrato contrato, Integer ano, Integer mes) {
+        if (contrato == null || ano == null || mes == null) {
+            return;
+        }
+
+        YearMonth periodo = YearMonth.of(ano, mes);
+        if (contrato.getDataInicio() != null && periodo.isBefore(YearMonth.from(contrato.getDataInicio()))) {
+            throw new IllegalArgumentException("Periodo do pagamento nao pode ser anterior ao inicio do contrato.");
+        }
+        if (contrato.getDataTermino() != null && periodo.isAfter(YearMonth.from(contrato.getDataTermino()))) {
+            throw new IllegalArgumentException("Periodo do pagamento nao pode ser posterior ao termino do contrato.");
+        }
+        if (periodo.isAfter(YearMonth.now())) {
+            throw new IllegalArgumentException("Periodo do pagamento nao pode ser posterior ao mes atual.");
+        }
+    }
+
+    private void validateDataPagamentoContrato(Contrato contrato, LocalDate dataPagamento) {
+        if (dataPagamento == null) {
+            return;
+        }
+        if (contrato != null && contrato.getDataInicio() != null && dataPagamento.isBefore(contrato.getDataInicio())) {
+            throw new IllegalArgumentException("Data de pagamento nao pode ser anterior ao inicio do contrato.");
+        }
+        if (dataPagamento.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Data de pagamento nao pode ser posterior a hoje.");
         }
     }
 

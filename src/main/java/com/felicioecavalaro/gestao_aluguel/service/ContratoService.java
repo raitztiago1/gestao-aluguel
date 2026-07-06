@@ -3,7 +3,6 @@ package com.felicioecavalaro.gestao_aluguel.service;
 import java.time.LocalDate;
 import java.util.List;
 
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +15,7 @@ import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -32,7 +32,8 @@ public class ContratoService {
     }
 
     public Contrato findById(Long id) {
-        Contrato contrato = repo.findById(id).orElseThrow(() -> new EntityNotFoundException("Contrato não encontrado: " + id));
+        Contrato contrato = repo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Contrato não encontrado: " + id));
         enrichContrato(contrato);
         return contrato;
     }
@@ -90,7 +91,8 @@ public class ContratoService {
         }
         boolean hasOverlap = repo.findBySalaId(contrato.getSala().getId()).stream()
                 .filter(existing -> existing.getId() == null || !existing.getId().equals(currentContratoId))
-                .filter(existing -> existing.getStatus() == StatusContrato.ATIVO || existing.getStatus() == StatusContrato.RENOVADO)
+                .filter(existing -> existing.getStatus() == StatusContrato.ATIVO
+                        || existing.getStatus() == StatusContrato.RENOVADO)
                 .filter(existing -> existing.getDataInicio() != null && existing.getDataTermino() != null)
                 .anyMatch(existing -> !contrato.getDataTermino().isBefore(existing.getDataInicio())
                         && !contrato.getDataInicio().isAfter(existing.getDataTermino()));
@@ -113,7 +115,18 @@ public class ContratoService {
             return "EM_ABERTO";
         }
 
+        if (contrato.getStatus() != StatusContrato.ATIVO) {
+            return "EM_ABERTO";
+        }
+
         LocalDate hoje = LocalDate.now();
+        if (contrato.getDataInicio() != null && hoje.isBefore(contrato.getDataInicio())) {
+            return "EM_ABERTO";
+        }
+        if (contrato.getDataTermino() != null && hoje.isAfter(contrato.getDataTermino())) {
+            return "EM_ABERTO";
+        }
+
         int ano = hoje.getYear();
         int mes = hoje.getMonthValue();
         int diaVencimento = contrato.getDiaVencimento();
@@ -124,9 +137,7 @@ public class ContratoService {
         boolean pagoNoMes = cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(contrato.getId()).stream()
                 .filter(cobranca -> cobranca.getStatus() == StatusCobranca.PAGO)
                 .filter(cobranca -> cobranca.getAno() != null && cobranca.getMes() != null)
-                .filter(cobranca -> cobranca.getAno().equals(ano) && cobranca.getMes().equals(mes))
-                .filter(cobranca -> cobranca.getDataPagamento() != null)
-                .anyMatch(cobranca -> !cobranca.getDataPagamento().isAfter(dataLimite));
+                .anyMatch(cobranca -> cobranca.getAno().equals(ano) && cobranca.getMes().equals(mes));
 
         if (pagoNoMes) {
             return "EM_DIA";
@@ -150,7 +161,8 @@ public class ContratoService {
 
         boolean occupied = repo.findBySalaId(salaId).stream()
                 .filter(existing -> existing.getDataInicio() != null && existing.getDataTermino() != null)
-                .filter(existing -> existing.getStatus() == StatusContrato.ATIVO || existing.getStatus() == StatusContrato.RENOVADO)
+                .filter(existing -> existing.getStatus() == StatusContrato.ATIVO
+                        || existing.getStatus() == StatusContrato.RENOVADO)
                 .anyMatch(existing -> !LocalDate.now().isBefore(existing.getDataInicio())
                         && !LocalDate.now().isAfter(existing.getDataTermino()));
 

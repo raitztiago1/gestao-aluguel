@@ -1,6 +1,7 @@
 package com.felicioecavalaro.gestao_aluguel.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
@@ -41,7 +42,6 @@ class TerrenoServiceTest {
                 .metragemTotal(BigDecimal.valueOf(300))
                 .vagasGaragem(4)
                 .quantidadeSalas(3)
-                .metragemSalas(BigDecimal.valueOf(120))
                 .build();
     }
 
@@ -87,6 +87,18 @@ class TerrenoServiceTest {
         Terreno created = service.create(terreno);
 
         assertEquals(terreno, created);
+        verify(repo).save(terreno);
+    }
+
+    @Test
+    void createClearsCommercialMetragemSalas() {
+        Terreno terreno = sampleCommercialTerreno();
+        terreno.setMetragemSalas(BigDecimal.valueOf(120));
+        when(repo.save(terreno)).thenReturn(terreno);
+
+        Terreno created = service.create(terreno);
+
+        assertNull(created.getMetragemSalas());
         verify(repo).save(terreno);
     }
 

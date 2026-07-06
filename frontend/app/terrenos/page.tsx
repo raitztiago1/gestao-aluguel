@@ -1,17 +1,16 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
 import { useCepLookup } from '../hooks/useCepLookup';
+import { useAuthGuard } from '../hooks/useAuth';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { formatAddressLine, formatArea, labelTipoTerreno } from '../lib/format';
 import { maskCep, onlyDigits, parseArea } from '../lib/masks';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
 type SortDirection = 'asc' | 'desc';
@@ -103,7 +102,6 @@ function formatTerrenoPayload(form: TerrenoForm) {
     metragemTotal: parseArea(form.metragemTotal),
     vagasGaragem: form.vagasGaragem ? Number(form.vagasGaragem) : undefined,
     quantidadeSalas: form.quantidadeSalas ? Number(form.quantidadeSalas) : undefined,
-    metragemSalas: form.metragemSalas ? parseArea(form.metragemSalas) : undefined,
     metragemCasa: form.metragemCasa ? parseArea(form.metragemCasa) : undefined,
     observacoes: form.observacoes.trim() || undefined
   };
@@ -111,8 +109,7 @@ function formatTerrenoPayload(form: TerrenoForm) {
 }
 
 export default function TerrenosPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [terrenos, setTerrenos] = useState<Terreno[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -138,15 +135,11 @@ export default function TerrenosPage() {
   }, []);
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-    setIsLoggedIn(true);
     carregarDados();
-    return setupUnloadLogout();
-  }, [router]);
+  }, [authStatus]);
 
   const carregarDados = async () => {
     try {
@@ -221,7 +214,7 @@ export default function TerrenosPage() {
           return a.metragemTotal;
         case 'detalhes':
           return a.tipo === 'COMERCIAL'
-            ? `${a.vagasGaragem ?? 0} ${a.quantidadeSalas ?? 0} ${a.metragemSalas ?? 0}`
+            ? `${a.vagasGaragem ?? 0} ${a.quantidadeSalas ?? 0}`
             : `${a.metragemCasa ?? 0}`;
         default:
           return '';
@@ -237,7 +230,7 @@ export default function TerrenosPage() {
           return b.metragemTotal;
         case 'detalhes':
           return b.tipo === 'COMERCIAL'
-            ? `${b.vagasGaragem ?? 0} ${b.quantidadeSalas ?? 0} ${b.metragemSalas ?? 0}`
+            ? `${b.vagasGaragem ?? 0} ${b.quantidadeSalas ?? 0}`
             : `${b.metragemCasa ?? 0}`;
         default:
           return '';
@@ -251,7 +244,7 @@ export default function TerrenosPage() {
     return String(valueA).localeCompare(String(valueB)) * direction;
   });
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
@@ -352,16 +345,6 @@ export default function TerrenosPage() {
                         onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
                       />
                     </div>
-                    <div className='form-group'>
-                      <label>Metragem das salas <span className='required-star'>*</span></label>
-                      <MaskedInput
-                        mask='area'
-                        required
-                        value={formTerreno.metragemSalas}
-                        onValueChange={(metragemSalas) => setFormTerreno((s) => ({ ...s, metragemSalas }))}
-                        inputMode='decimal'
-                      />
-                    </div>
                   </div>
                 )}
 
@@ -444,7 +427,7 @@ export default function TerrenosPage() {
                   <td>{formatArea(terreno.metragemTotal)}</td>
                   <td>
                     {terreno.tipo === 'COMERCIAL'
-                      ? `${terreno.vagasGaragem ?? 0} vagas · ${terreno.quantidadeSalas ?? 0} salas · ${formatArea(terreno.metragemSalas)}`
+                      ? `${terreno.vagasGaragem ?? 0} vagas · ${terreno.quantidadeSalas ?? 0} salas`
                       : `Casa: ${formatArea(terreno.metragemCasa)}`}
                   </td>
                   <td className='table-actions'>

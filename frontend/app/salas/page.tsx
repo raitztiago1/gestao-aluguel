@@ -1,16 +1,15 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
 import StatusBadge from '../components/StatusBadge';
+import { useAuthGuard } from '../hooks/useAuth';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { formatAddressLine, formatArea, formatTerrenoOption } from '../lib/format';
-import { maskArea, parseArea } from '../lib/masks';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
+import { parseArea } from '../lib/masks';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
 type SortDirection = 'asc' | 'desc';
@@ -24,6 +23,7 @@ type Terreno = {
   bairro?: string;
   cidade?: string;
   estado?: string;
+  quantidadeSalas?: number;
 };
 
 type Sala = {
@@ -53,8 +53,7 @@ const defaultSalaForm: SalaForm = {
 };
 
 export default function SalasPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [salas, setSalas] = useState<Sala[]>([]);
   const [terrenos, setTerrenos] = useState<Terreno[]>([]);
   const [formSala, setFormSala] = useState<SalaForm>(defaultSalaForm);
@@ -69,8 +68,15 @@ export default function SalasPage() {
 
   const terrenosDisponiveisParaSala = terrenos.filter((terreno) => {
     const isCurrentSelection = formSala.terrenoId === String(terreno.id);
-    const alreadyHasSala = salas.some((sala) => sala.terreno?.id === terreno.id);
-    return isCurrentSelection || !alreadyHasSala || terreno.tipo === 'COMERCIAL';
+    const salasDoTerreno = salas.filter((sala) => sala.terreno?.id === terreno.id);
+    const alreadyHasSala = salasDoTerreno.length > 0;
+    const reachedCommercialLimit = terreno.tipo === 'COMERCIAL'
+      && terreno.quantidadeSalas != null
+      && salasDoTerreno.length >= terreno.quantidadeSalas;
+
+    if (isCurrentSelection) return true;
+    if (terreno.tipo === 'COMERCIAL') return !reachedCommercialLimit;
+    return !alreadyHasSala;
   });
 
   useEffect(() => {
@@ -78,15 +84,11 @@ export default function SalasPage() {
   }, []);
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-    setIsLoggedIn(true);
     carregarDados();
-    return setupUnloadLogout();
-  }, [router]);
+  }, [authStatus]);
 
   const carregarDados = async () => {
     try {
@@ -205,7 +207,7 @@ export default function SalasPage() {
     return String(valueA).localeCompare(String(valueB)) * direction;
   });
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
 

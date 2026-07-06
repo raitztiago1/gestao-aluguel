@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusCobranca;
 
 import jakarta.persistence.Column;
@@ -35,6 +36,7 @@ public class Cobranca {
 
     @ManyToOne
     @JoinColumn(name = "contrato_id", nullable = false)
+    @JsonIgnore
     private Contrato contrato;
 
     @Column(name = "ano", nullable = false)

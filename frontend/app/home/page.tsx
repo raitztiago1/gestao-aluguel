@@ -1,11 +1,11 @@
 ﻿'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import StatusBadge from '../components/StatusBadge';
-import { fetchJson } from '../lib/api';
+import { useAuthGuard } from '../hooks/useAuth';
+import { deleteJson, fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
   formatAddressLine,
@@ -14,7 +14,6 @@ import {
   labelStatusContrato,
   labelTipoTerreno
 } from '../lib/format';
-import { clearSession, isSessionValid, setupUnloadLogout } from '../lib/session';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
 
@@ -65,9 +64,123 @@ type Cobranca = {
   observacoes?: string;
 };
 
+type ModoPagamentoForm = 'adicionar' | 'editar' | null;
+
+function formatarDataInput(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function criarDataPeriodo(ano: number, mes: number) {
+  return new Date(ano, mes - 1, 1);
+}
+
+function obterDataInicioContrato(contrato?: Contrato | null) {
+  return contrato?.dataInicio?.slice(0, 10);
+}
+
+function periodoPermitido(contrato: Contrato | null, ano?: number, mes?: number) {
+  if (!ano || !mes) {
+    return false;
+  }
+
+  const periodo = criarDataPeriodo(ano, mes);
+  const periodoAtual = criarDataPeriodo(new Date().getFullYear(), new Date().getMonth() + 1);
+  const dataInicio = obterDataInicioContrato(contrato);
+
+  if (dataInicio) {
+    const periodoInicial = criarDataPeriodo(
+      new Date(`${dataInicio}T00:00:00`).getFullYear(),
+      new Date(`${dataInicio}T00:00:00`).getMonth() + 1
+    );
+    if (periodo < periodoInicial) {
+      return false;
+    }
+  }
+
+  if (contrato?.dataTermino) {
+    const dataTermino = new Date(`${contrato.dataTermino}T00:00:00`);
+    const periodoFinal = criarDataPeriodo(dataTermino.getFullYear(), dataTermino.getMonth() + 1);
+    if (periodo > periodoFinal) {
+      return false;
+    }
+  }
+
+  return periodo <= periodoAtual;
+}
+
+function dataPagamentoPermitida(contrato: Contrato | null, dataPagamento?: string) {
+  if (!dataPagamento) {
+    return true;
+  }
+
+  const dataInicio = obterDataInicioContrato(contrato);
+  if (dataInicio && dataPagamento < dataInicio) {
+    return false;
+  }
+
+  return dataPagamento <= formatarDataInput();
+}
+
+const criarPagamentoInicial = (cobrancasExistentes: Cobranca[] = [], contrato?: Contrato | null): Partial<Cobranca> => {
+  const periodosOcupados = new Set(
+    cobrancasExistentes
+      .filter((cobranca) => cobranca.ano && cobranca.mes)
+      .map((cobranca) => `${cobranca.ano}-${cobranca.mes}`)
+  );
+  const dataSugerida = contrato?.dataInicio ? new Date(`${contrato.dataInicio}T00:00:00`) : new Date();
+  const hoje = new Date();
+  dataSugerida.setDate(1);
+  hoje.setDate(1);
+
+  while (
+    dataSugerida <= hoje &&
+    periodosOcupados.has(`${dataSugerida.getFullYear()}-${dataSugerida.getMonth() + 1}`)
+  ) {
+    dataSugerida.setMonth(dataSugerida.getMonth() + 1);
+  }
+
+  return {
+    mes: dataSugerida.getMonth() + 1,
+    ano: dataSugerida.getFullYear(),
+    status: 'PAGO',
+    dataPagamento: formatarDataInput()
+  };
+};
+
+function normalizarCobrancas(items: Cobranca[]): Cobranca[] {
+  return [...items]
+    .map((item) => ({
+      ...item,
+      id: Number(item.id),
+      ano: Number(item.ano),
+      mes: Number(item.mes),
+      valor: Number(item.valor)
+    }))
+    .sort((a, b) => b.ano - a.ano || b.mes - a.mes);
+}
+
+function formatarPeriodo(ano: number, mes: number) {
+  const nomeMes = new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'long' });
+  return `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}/${ano}`;
+}
+
+function obterAnoInicioContrato(contrato?: Contrato | null) {
+  if (!contrato?.dataInicio) {
+    return 1900;
+  }
+
+  return new Date(`${contrato.dataInicio}T00:00:00`).getFullYear();
+}
+
+function mesPermitidoParaAno(contrato: Contrato | null, ano: number | undefined, mes: number) {
+  return periodoPermitido(contrato, ano, mes);
+}
+
 export default function Home() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [terrenos, setTerrenos] = useState<Terreno[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -77,12 +190,12 @@ export default function Home() {
   const [selectedModal, setSelectedModal] = useState<ModalType>(null);
   const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
   const [cobrancas, setCobrancas] = useState<Cobranca[]>([]);
-  const [novaCobranca, setNovaCobranca] = useState<Partial<Cobranca>>({
-    mes: new Date().getMonth() + 1,
-    ano: new Date().getFullYear(),
-    status: 'PAGO'
-  });
+  const [modoPagamentoForm, setModoPagamentoForm] = useState<ModoPagamentoForm>(null);
+  const [cobrancaEmEdicao, setCobrancaEmEdicao] = useState<Cobranca | null>(null);
+  const [formPagamento, setFormPagamento] = useState<Partial<Cobranca>>(criarPagamentoInicial());
   const [carregandoCobrancas, setCarregandoCobrancas] = useState(false);
+  const [salvandoPagamento, setSalvandoPagamento] = useState(false);
+  const [excluindoCobrancaId, setExcluindoCobrancaId] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -91,15 +204,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-    setIsLoggedIn(true);
     carregarDados();
-    return setupUnloadLogout();
-  }, [router]);
+  }, [authStatus]);
 
   const carregarDados = async () => {
     try {
@@ -127,54 +236,149 @@ export default function Home() {
     try {
       setCarregandoCobrancas(true);
       const dados = await fetchJson<Cobranca>(`/api/cobrancas/contrato/${contratoId}`);
-      setCobrancas(dados || []);
+      const cobrancasNormalizadas = normalizarCobrancas(dados || []);
+      setCobrancas(cobrancasNormalizadas);
+      return cobrancasNormalizadas;
     } catch (err) {
       setErro(getErrorMessage(err, 'Erro ao carregar cobranças.'));
+      return [];
     } finally {
       setCarregandoCobrancas(false);
     }
   };
 
+  const cancelarFormularioPagamento = () => {
+    setModoPagamentoForm(null);
+    setCobrancaEmEdicao(null);
+    setFormPagamento(criarPagamentoInicial([], contratoSelecionado));
+  };
+
+  const abrirFormularioAdicionar = () => {
+    const pagamentoInicial = criarPagamentoInicial(cobrancas, contratoSelecionado);
+    if (!periodoPermitido(contratoSelecionado, pagamentoInicial.ano, pagamentoInicial.mes)) {
+      setErro('Todos os pagamentos do contrato ate o mes atual ja foram registrados.');
+      return;
+    }
+
+    setModoPagamentoForm('adicionar');
+    setCobrancaEmEdicao(null);
+    setFormPagamento(pagamentoInicial);
+    setErro(null);
+  };
+
+  const abrirFormularioEditar = (cobranca: Cobranca) => {
+    setModoPagamentoForm('editar');
+    setCobrancaEmEdicao(cobranca);
+    setFormPagamento({
+      id: cobranca.id,
+      ano: cobranca.ano,
+      mes: cobranca.mes,
+      valor: cobranca.valor,
+      status: cobranca.status,
+      dataPagamento: cobranca.dataPagamento?.slice(0, 10),
+      observacoes: cobranca.observacoes || ''
+    });
+  };
+
   const abrirModalPagamentos = (contrato: Contrato) => {
     setContratoSelecionado(contrato);
     setSelectedModal('pagamentos');
-    setNovaCobranca({
-      mes: new Date().getMonth() + 1,
-      ano: new Date().getFullYear(),
-      status: 'PAGO'
-    });
+    setModoPagamentoForm(null);
+    setCobrancaEmEdicao(null);
+    setFormPagamento(criarPagamentoInicial([], contrato));
     carregarCobrancas(contrato.id);
   };
 
-  const registrarPagamento = async () => {
-    if (!contratoSelecionado || !novaCobranca.mes || !novaCobranca.ano) {
+  const salvarPagamento = async () => {
+    if (!contratoSelecionado || !formPagamento.mes || !formPagamento.ano) {
       setErro('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    if (!periodoPermitido(contratoSelecionado, formPagamento.ano, formPagamento.mes)) {
+      setErro('Selecione um periodo dentro da vigencia do contrato e ate o mes atual.');
+      return;
+    }
+    if (!dataPagamentoPermitida(contratoSelecionado, formPagamento.dataPagamento)) {
+      setErro('A data de pagamento deve estar entre a data de inicio do contrato e hoje.');
+      return;
+    }
+
+    const periodoJaRegistrado = cobrancas.some(
+      (cobranca) => cobranca.ano === formPagamento.ano && cobranca.mes === formPagamento.mes
+    );
+    if (modoPagamentoForm === 'adicionar' && periodoJaRegistrado) {
+      setErro('Ja existe um pagamento registrado para este periodo. Use Editar ou escolha outro mes.');
       return;
     }
 
     try {
-      const response = await fetch(`/api/cobrancas/contrato/${contratoSelecionado.id}/mes/${novaCobranca.ano}/${novaCobranca.mes}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      setSalvandoPagamento(true);
+
+      if (modoPagamentoForm === 'editar' && cobrancaEmEdicao) {
+        await requestJson(`/api/cobrancas/${cobrancaEmEdicao.id}`, 'PUT', {
           status: 'PAGO',
-          valor: novaCobranca.valor || contratoSelecionado.valorAluguel,
-          dataPagamento: novaCobranca.dataPagamento || new Date().toISOString().slice(0, 10),
-          observacoes: novaCobranca.observacoes
-        })
-      });
+          valor: formPagamento.valor || contratoSelecionado.valorAluguel,
+          dataPagamento: formPagamento.dataPagamento || formatarDataInput(),
+          observacoes: formPagamento.observacoes
+        });
+      } else {
+        await requestJson(
+          `/api/cobrancas/contrato/${contratoSelecionado.id}/mes/${formPagamento.ano}/${formPagamento.mes}`,
+          'POST',
+          {
+            status: 'PAGO',
+            valor: formPagamento.valor || contratoSelecionado.valorAluguel,
+            dataPagamento: formPagamento.dataPagamento || formatarDataInput(),
+            observacoes: formPagamento.observacoes
+          }
+        );
+      }
 
-      if (!response.ok) throw new Error('Erro ao registrar pagamento');
-
-      await Promise.all([carregarCobrancas(contratoSelecionado.id), carregarDados()]);
-      setNovaCobranca({
-        mes: new Date().getMonth() + 1,
-        ano: new Date().getFullYear(),
-        status: 'PAGO'
-      });
+      await carregarDados();
+      const cobrancasAtualizadas = await carregarCobrancas(contratoSelecionado.id);
+      if (modoPagamentoForm === 'adicionar') {
+        const proximoPagamento = criarPagamentoInicial(cobrancasAtualizadas, contratoSelecionado);
+        if (periodoPermitido(contratoSelecionado, proximoPagamento.ano, proximoPagamento.mes)) {
+          setFormPagamento(proximoPagamento);
+        } else {
+          cancelarFormularioPagamento();
+        }
+      } else {
+        cancelarFormularioPagamento();
+      }
       setErro(null);
     } catch (err) {
-      setErro(getErrorMessage(err, 'Erro ao registrar pagamento.'));
+      setErro(getErrorMessage(err, 'Erro ao salvar pagamento.'));
+    } finally {
+      setSalvandoPagamento(false);
+    }
+  };
+
+  const excluirPagamento = async (cobranca: Cobranca) => {
+    if (!contratoSelecionado) {
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `Excluir o pagamento de ${formatarPeriodo(cobranca.ano, cobranca.mes)}? Esta ação não pode ser desfeita.`
+    );
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      setExcluindoCobrancaId(cobranca.id);
+      await deleteJson(`/api/cobrancas/${cobranca.id}`);
+      if (cobrancaEmEdicao?.id === cobranca.id) {
+        cancelarFormularioPagamento();
+      }
+      await carregarDados();
+      await carregarCobrancas(contratoSelecionado.id);
+      setErro(null);
+    } catch (err) {
+      setErro(getErrorMessage(err, 'Erro ao excluir pagamento.'));
+    } finally {
+      setExcluindoCobrancaId(null);
     }
   };
 
@@ -204,22 +408,29 @@ export default function Home() {
   };
 
   const getSituacaoContrato = (contrato: Contrato) => {
-    if (contrato.situacao === 'EM_DIA') {
+    if (contrato.status !== 'ATIVO') {
+      return { label: 'Em aberto', className: 'badge badge-warning' };
+    }
+
+    const situacao = contrato.situacao || 'EM_ABERTO';
+
+    if (situacao === 'EM_DIA') {
       return { label: 'Em dia', className: 'badge badge-success' };
     }
-    if (contrato.situacao === 'EM_ATRASO') {
+    if (situacao === 'EM_ATRASO') {
       return { label: 'Em atraso', className: 'badge badge-danger' };
     }
     return { label: 'Em aberto', className: 'badge badge-warning' };
   };
 
-  const verificarAtraso = (contrato: Contrato) => getSituacaoContrato(contrato).label === 'Em atraso';
+  const verificarAtraso = (contrato: Contrato) =>
+    contrato.status === 'ATIVO' && contrato.situacao === 'EM_ATRASO';
 
   const contratosEmAtraso = contratos.filter(verificarAtraso);
   const contratosAtivos = contratos.filter((c) => c.status === 'ATIVO');
   const salasDisponiveis = salas.filter((s) => s.status === 'DISPONIVEL');
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
 
@@ -234,30 +445,24 @@ export default function Home() {
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
       <section className='summary-grid'>
-        <article className='summary-card'>
+        <button type='button' className='summary-card summary-action-card' onClick={() => setSelectedModal('terrenos')}>
           <p className='summary-label'>Terrenos cadastrados</p>
           <strong className='summary-value'>{terrenosCount}</strong>
-          <button className='button button-link' onClick={() => setSelectedModal('terrenos')}>
-            Ver detalhes
-          </button>
-        </article>
-        <article className='summary-card'>
+          <span className='summary-action-text'>Ver detalhes</span>
+        </button>
+        <button type='button' className='summary-card summary-action-card' onClick={() => setSelectedModal('contratos')}>
           <p className='summary-label'>Contratos ativos</p>
           <strong className='summary-value'>{contratosAtivosCount}</strong>
-          <button className='button button-link' onClick={() => setSelectedModal('contratos')}>
-            Ver detalhes
-          </button>
-        </article>
-        <article className='summary-card summary-card-highlight'>
+          <span className='summary-action-text'>Ver detalhes</span>
+        </button>
+        <button type='button' className='summary-card summary-card-highlight summary-action-card' onClick={() => setSelectedModal('salas')}>
           <p className='summary-label'>Salas para alugar</p>
           <strong className='summary-value'>{salasDisponiveisCount}</strong>
-          <button className='button button-link' onClick={() => setSelectedModal('salas')}>
-            Ver detalhes
-          </button>
-        </article>
+          <span className='summary-action-text'>Ver detalhes</span>
+        </button>
       </section>
 
-      {selectedModal && (
+      {selectedModal && selectedModal !== 'pagamentos' && (
         <div className='modal-backdrop' onClick={() => setSelectedModal(null)}>
           <div className='modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
@@ -397,67 +602,103 @@ export default function Home() {
               {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
               <div className='form-section'>
-                <h3>Registrar Pagamento</h3>
-                <div className='form-group'>
-                  <label htmlFor='ano'>Ano</label>
-                  <input
-                    id='ano'
-                    type='number'
-                    value={novaCobranca.ano || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, ano: parseInt(e.target.value) })}
-                    min='2020'
-                    max={new Date().getFullYear() + 1}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label htmlFor='mes'>Mês</label>
-                  <select
-                    id='mes'
-                    value={novaCobranca.mes || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, mes: parseInt(e.target.value) })}
+                <div className='section-toolbar'>
+                  <h3>Histórico de Pagamentos ({cobrancas.length})</h3>
+                  <button
+                    type='button'
+                    className='button button-primary button-small'
+                    onClick={() => (modoPagamentoForm === 'adicionar' ? cancelarFormularioPagamento() : abrirFormularioAdicionar())}
                   >
-                    {[...Array(12)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {new Date(2024, i).toLocaleString('pt-BR', { month: 'long' })}
-                      </option>
-                    ))}
-                  </select>
+                    {modoPagamentoForm === 'adicionar' ? 'Cancelar' : 'Adicionar pagamento'}
+                  </button>
                 </div>
-                <div className='form-group'>
-                  <label htmlFor='valor'>Valor</label>
-                  <input
-                    id='valor'
-                    type='number'
-                    step='0.01'
-                    value={novaCobranca.valor || contratoSelecionado.valorAluguel || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, valor: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label htmlFor='dataPagamento'>Data de Pagamento</label>
-                  <input
-                    id='dataPagamento'
-                    type='date'
-                    value={novaCobranca.dataPagamento || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, dataPagamento: e.target.value })}
-                  />
-                </div>
-                <div className='form-group'>
-                  <label htmlFor='observacoes'>Observações</label>
-                  <textarea
-                    id='observacoes'
-                    value={novaCobranca.observacoes || ''}
-                    onChange={(e) => setNovaCobranca({ ...novaCobranca, observacoes: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <button className='button button-primary' onClick={registrarPagamento}>
-                  Registrar Pagamento
-                </button>
-              </div>
-
-              <div className='form-section'>
-                <h3>Histórico de Pagamentos</h3>
+                {modoPagamentoForm && (
+                  <div className='payment-form-grid'>
+                    <div className='form-group'>
+                      <label htmlFor='ano'>Ano</label>
+                      <input
+                        id='ano'
+                        type='number'
+                        value={formPagamento.ano || ''}
+                        onChange={(e) => setFormPagamento({ ...formPagamento, ano: parseInt(e.target.value, 10) })}
+                        min={obterAnoInicioContrato(contratoSelecionado)}
+                        max={new Date().getFullYear()}
+                        disabled={modoPagamentoForm === 'editar'}
+                      />
+                    </div>
+                    <div className='form-group'>
+                      <label htmlFor='mes'>Mês</label>
+                      <select
+                        id='mes'
+                        value={formPagamento.mes || ''}
+                        onChange={(e) => setFormPagamento({ ...formPagamento, mes: parseInt(e.target.value, 10) })}
+                        disabled={modoPagamentoForm === 'editar'}
+                      >
+                        {[...Array(12)].map((_, i) => (
+                          <option
+                            key={i + 1}
+                            value={i + 1}
+                            disabled={!mesPermitidoParaAno(contratoSelecionado, formPagamento.ano, i + 1)}
+                          >
+                            {new Date(2024, i).toLocaleString('pt-BR', { month: 'long' })}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className='form-group'>
+                      <label htmlFor='valor'>Valor</label>
+                      <input
+                        id='valor'
+                        type='number'
+                        step='0.01'
+                        value={formPagamento.valor ?? contratoSelecionado.valorAluguel ?? ''}
+                        onChange={(e) => setFormPagamento({ ...formPagamento, valor: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                    <div className='form-group'>
+                      <label htmlFor='dataPagamento'>Data de Pagamento</label>
+                      <input
+                        id='dataPagamento'
+                        type='date'
+                        value={formPagamento.dataPagamento || ''}
+                        onChange={(e) => setFormPagamento({ ...formPagamento, dataPagamento: e.target.value })}
+                        min={obterDataInicioContrato(contratoSelecionado)}
+                        max={formatarDataInput()}
+                      />
+                    </div>
+                    <div className='form-group payment-notes'>
+                      <label htmlFor='observacoes'>Observações</label>
+                      <textarea
+                        id='observacoes'
+                        value={formPagamento.observacoes || ''}
+                        onChange={(e) => setFormPagamento({ ...formPagamento, observacoes: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                    <div className='payment-form-actions'>
+                      <button
+                        type='button'
+                        className='button button-primary'
+                        onClick={salvarPagamento}
+                        disabled={salvandoPagamento}
+                      >
+                        {salvandoPagamento
+                          ? 'Salvando...'
+                          : modoPagamentoForm === 'editar'
+                            ? 'Salvar alterações'
+                            : 'Registrar pagamento'}
+                      </button>
+                      <button
+                        type='button'
+                        className='button button-secondary'
+                        onClick={cancelarFormularioPagamento}
+                        disabled={salvandoPagamento}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {carregandoCobrancas ? (
                   <p>Carregando histórico...</p>
                 ) : cobrancas.length === 0 ? (
@@ -472,22 +713,45 @@ export default function Home() {
                           <th>Status</th>
                           <th>Data Pagamento</th>
                           <th>Observações</th>
+                          <th>Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {cobrancas.map((cobranca) => (
-                          <tr key={cobranca.id}>
-                            <td>
-                              {new Date(2024, cobranca.mes - 1).toLocaleString('pt-BR', { month: 'short' })}/{cobranca.ano}
-                            </td>
+                          <tr key={`${cobranca.id}-${cobranca.ano}-${cobranca.mes}`}>
+                            <td>{formatarPeriodo(cobranca.ano, cobranca.mes)}</td>
                             <td>{formatCurrency(cobranca.valor)}</td>
                             <td>
                               <span className={obterClasseStatus(cobranca.status)}>
                                 {obterLabelStatus(cobranca.status)}
                               </span>
                             </td>
-                            <td>{cobranca.dataPagamento ? new Date(cobranca.dataPagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                            <td>
+                              {cobranca.dataPagamento
+                                ? new Date(`${cobranca.dataPagamento}T00:00:00`).toLocaleDateString('pt-BR')
+                                : '—'}
+                            </td>
                             <td>{cobranca.observacoes || '—'}</td>
+                            <td>
+                              <div className='table-actions'>
+                                <button
+                                  type='button'
+                                  className='button button-small button-outline'
+                                  onClick={() => abrirFormularioEditar(cobranca)}
+                                  disabled={excluindoCobrancaId === cobranca.id}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type='button'
+                                  className='button button-small button-danger'
+                                  onClick={() => excluirPagamento(cobranca)}
+                                  disabled={excluindoCobrancaId === cobranca.id}
+                                >
+                                  {excluindoCobrancaId === cobranca.id ? 'Excluindo...' : 'Excluir'}
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

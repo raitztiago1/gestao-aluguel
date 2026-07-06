@@ -5,6 +5,7 @@
     isNetworkError,
     safeJsonParse
 } from './errors';
+import { getToken } from './session';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -13,7 +14,7 @@ function getAuthHeaders(): Record<string, string> {
         return {};
     }
 
-    const token = localStorage.getItem('token');
+    const token = getToken();
     if (!token) {
         return {};
     }
@@ -87,6 +88,18 @@ export async function requestJson<T>(path: string, method: string, body?: unknow
   });
 
   return handleResponse<T>(res);
+}
+
+export async function deleteJson(path: string): Promise<void> {
+  const res = await request(path, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeaders()
+    }
+  });
+
+  await handleResponse<void>(res);
 }
 
 export async function login(email: string, senha: string): Promise<{ token: string; usuarioId: number; nomeCompleto: string; email: string }> {

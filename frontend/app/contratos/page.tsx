@@ -1,11 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
 import StatusBadge from '../components/StatusBadge';
+import { useAuthGuard } from '../hooks/useAuth';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -15,7 +15,7 @@ import {
     formatSalaOption
 } from '../lib/format';
 import { dateBrToIso, isoToDateBr, maskCurrency, onlyDigits, parseCurrency } from '../lib/masks';
-import { clearSession, getToken, isSessionValid, setupUnloadLogout } from '../lib/session';
+import { getToken } from '../lib/session';
 
 type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVACAO' | 'CANCELADO';
 type SortDirection = 'asc' | 'desc';
@@ -81,8 +81,7 @@ const defaultContratoForm: ContratoForm = {
 };
 
 export default function ContratosPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authStatus = useAuthGuard();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
   const [locatarios, setLocatarios] = useState<Locatario[]>([]);
@@ -102,15 +101,11 @@ export default function ContratosPage() {
   }, []);
 
   useEffect(() => {
-    if (!isSessionValid()) {
-      clearSession();
-      router.push('/login');
+    if (authStatus !== 'authenticated') {
       return;
     }
-    setIsLoggedIn(true);
     carregarDados();
-    return setupUnloadLogout();
-  }, [router]);
+  }, [authStatus]);
 
   const carregarDados = async () => {
     try {
@@ -278,7 +273,7 @@ export default function ContratosPage() {
     return String(valueA).localeCompare(String(valueB)) * direction;
   });
 
-  if (!isLoggedIn) {
+  if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
   }
 

@@ -1,10 +1,11 @@
 ﻿'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import ErrorAlert from '../components/ErrorAlert';
+import { useGuestGuard } from '../hooks/useAuth';
 import { login } from '../lib/api';
-import { clearSession, createSession, isSessionValid } from '../lib/session';
+import { createSession } from '../lib/session';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,14 +13,11 @@ export default function Login() {
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const authStatus = useGuestGuard();
 
-  useEffect(() => {
-    if (isSessionValid()) {
-      router.push('/home');
-    } else {
-      clearSession();
-    }
-  }, [router]);
+  if (authStatus === 'loading') {
+    return <div className='auth-page'><div className='auth-card'>Redirecionando...</div></div>;
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -45,7 +43,7 @@ export default function Login() {
       const response = await login(trimmedEmail, senha);
       
       createSession(response);
-      router.push('/home');
+      router.replace('/home');
     } catch (err: any) {
       const mensagem = err?.message || 'Erro ao fazer login. Verifique suas credenciais.';
       setErro(mensagem);

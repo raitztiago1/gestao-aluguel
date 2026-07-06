@@ -9,12 +9,13 @@ export default function Home() {
 
   useEffect(() => {
     if (isSessionValid()) {
-      router.push('/home');
+      router.replace('/home');
     } else {
       clearSession();
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <div>Redirecionando...</div>;
 }

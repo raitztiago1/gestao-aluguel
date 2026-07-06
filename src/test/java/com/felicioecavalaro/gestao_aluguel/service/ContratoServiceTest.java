@@ -19,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
+import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusCobranca;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
@@ -103,6 +105,32 @@ class ContratoServiceTest {
         List<Contrato> result = service.findAll();
 
         assertEquals("EM_ABERTO", result.get(0).getSituacao());
+    }
+
+    @Test
+    void findAllMarksContratoAsEmDiaWhenCurrentMonthIsPaidAfterDueDate() {
+        LocalDate hoje = LocalDate.now();
+        int diaVencimento = Math.max(1, hoje.getDayOfMonth() - 1);
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .status(StatusContrato.ATIVO)
+                .dataInicio(hoje.minusMonths(1))
+                .dataTermino(hoje.plusMonths(1))
+                .diaVencimento(diaVencimento)
+                .build();
+        Cobranca cobranca = Cobranca.builder()
+                .ano(hoje.getYear())
+                .mes(hoje.getMonthValue())
+                .status(StatusCobranca.PAGO)
+                .dataPagamento(hoje)
+                .build();
+
+        when(repo.findAll()).thenReturn(List.of(contrato));
+        when(cobrancaRepository.findAllByContratoIdOrderByAnoDescMesDesc(1L)).thenReturn(List.of(cobranca));
+
+        List<Contrato> result = service.findAll();
+
+        assertEquals("EM_DIA", result.get(0).getSituacao());
     }
 
     @Test
