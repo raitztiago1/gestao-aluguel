@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
+import com.felicioecavalaro.gestao_aluguel.dto.ContratoRequestDTO;
 import com.felicioecavalaro.gestao_aluguel.service.ContratoService;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,11 +68,25 @@ class ContratoControllerTest {
     @Test
     void createReturnsSavedContrato() {
         Contrato contrato = sampleContrato();
-        when(service.create(any(Contrato.class))).thenReturn(contrato);
+        ContratoRequestDTO dto = new ContratoRequestDTO(
+                1L, 1L,
+                contrato.getDataInicio(),
+                contrato.getDataTermino(),
+                contrato.getValorAluguel(),
+                contrato.getDiaVencimento(),
+                null, null, null, null, null, null, null, null);
+        when(service.create(any(ContratoRequestDTO.class))).thenReturn(contrato);
 
-        Contrato result = controller.create(contrato);
+        Contrato result = controller.create(new ContratoRequestDTO.ContratoPayload(
+                new ContratoRequestDTO.EntityRef(1L),
+                new ContratoRequestDTO.EntityRef(1L),
+                dto.dataInicio(),
+                dto.dataTermino(),
+                dto.valorAluguel(),
+                dto.diaVencimento(),
+                null, null, null, null, null, null, null, null));
 
         assertEquals(contrato, result);
-        verify(service).create(contrato);
+        verify(service).create(any(ContratoRequestDTO.class));
     }
 }

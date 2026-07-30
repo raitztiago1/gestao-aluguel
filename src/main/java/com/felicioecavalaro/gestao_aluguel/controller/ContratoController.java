@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
+import com.felicioecavalaro.gestao_aluguel.dto.ContratoRequestDTO;
 import com.felicioecavalaro.gestao_aluguel.service.ContratoService;
 
 import lombok.RequiredArgsConstructor;
@@ -36,13 +37,13 @@ public class ContratoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Contrato create(@RequestBody Contrato contrato) {
-        return service.create(contrato);
+    public Contrato create(@RequestBody ContratoRequestDTO.ContratoPayload payload) {
+        return service.create(ContratoRequestDTO.fromPayload(payload));
     }
 
     @PutMapping("/{id}")
-    public Contrato update(@PathVariable Long id, @RequestBody Contrato contrato) {
-        return service.update(id, contrato);
+    public Contrato update(@PathVariable Long id, @RequestBody ContratoRequestDTO.ContratoPayload payload) {
+        return service.update(id, ContratoRequestDTO.fromPayload(payload));
     }
 
     @DeleteMapping("/{id}")

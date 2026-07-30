@@ -5,11 +5,13 @@ import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import SortableTh from '../components/SortableTh';
 import { useCepLookup } from '../hooks/useCepLookup';
 import { useAuthGuard } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
-import { formatAddressLine, formatArea, labelTipoTerreno } from '../lib/format';
+import { formatAddressLine, formatArea, formatAreaInput, labelTipoTerreno } from '../lib/format';
 import { maskCep, onlyDigits, parseArea } from '../lib/masks';
 
 type TipoTerreno = 'COMERCIAL' | 'RESIDENCIAL';
@@ -80,11 +82,11 @@ function terrenoToForm(terreno: Terreno): TerrenoForm {
     cidade: terreno.cidade,
     estado: terreno.estado,
     cep: terreno.cep ? maskCep(terreno.cep) : '',
-    metragemTotal: String(terreno.metragemTotal).replace('.', ','),
+    metragemTotal: formatAreaInput(terreno.metragemTotal),
     vagasGaragem: terreno.vagasGaragem?.toString() ?? '',
     quantidadeSalas: terreno.quantidadeSalas?.toString() ?? '',
-    metragemSalas: terreno.metragemSalas != null ? String(terreno.metragemSalas).replace('.', ',') : '',
-    metragemCasa: terreno.metragemCasa != null ? String(terreno.metragemCasa).replace('.', ',') : '',
+    metragemSalas: formatAreaInput(terreno.metragemSalas),
+    metragemCasa: formatAreaInput(terreno.metragemCasa),
     observacoes: terreno.observacoes ?? ''
   };
 }
@@ -112,6 +114,7 @@ export default function TerrenosPage() {
   const authStatus = useAuthGuard();
   const [terrenos, setTerrenos] = useState<Terreno[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [formTerreno, setFormTerreno] = useState<TerrenoForm>(defaultTerrenoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
@@ -165,7 +168,7 @@ export default function TerrenosPage() {
       resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(getErrorMessage(err, 'Falha ao salvar terreno.'));
+      setErroModal(getErrorMessage(err, 'Falha ao salvar terreno.'));
     }
   };
 
@@ -173,7 +176,7 @@ export default function TerrenosPage() {
     setFormTerreno(terrenoToForm(terreno));
     setModoEdicao(true);
     setShowModal(true);
-    setErro(null);
+    setErroModal(null);
     resetCepRef();
   };
 
@@ -191,8 +194,23 @@ export default function TerrenosPage() {
     setModoEdicao(false);
     setFormTerreno(defaultTerrenoForm);
     setShowModal(false);
-    setErro(null);
+    setErroModal(null);
     resetCepRef();
+  };
+
+  useEscapeKey(resetForm, showModal);
+
+  const handleTipoChange = (novoTipo: TipoTerreno) => {
+    setFormTerreno((s) => {
+      const patch: Partial<TerrenoForm> = { tipo: novoTipo };
+      if (s.tipo === 'COMERCIAL') {
+        patch.vagasGaragem = '';
+        patch.quantidadeSalas = '';
+      } else if (s.tipo === 'RESIDENCIAL') {
+        patch.metragemCasa = '';
+      }
+      return { ...s, ...patch };
+    });
   };
 
   const handleSort = (key: TerrenoSortKey) => {
@@ -264,7 +282,7 @@ export default function TerrenosPage() {
             setModoEdicao(false);
             setFormTerreno(defaultTerrenoForm);
             setShowModal(true);
-            setErro(null);
+            setErroModal(null);
             resetCepRef();
           }}
         >
@@ -284,14 +302,17 @@ export default function TerrenosPage() {
             </div>
 
             <div className='modal-content'>
+              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
               <form onSubmit={salvarTerreno} className='form-grid'>
                 <div className='form-group'>
-                  <label>Tipo <span className='required-star'>*</span></label>
+                  <label htmlFor='terreno-tipo'>Tipo <span className='required-star' aria-hidden='true'>*</span></label>
                   <select
+                    id='terreno-tipo'
                     className='select-field'
                     value={formTerreno.tipo}
-                    onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))}
+                    onChange={(e) => handleTipoChange(e.target.value as TipoTerreno)}
                     required
+                    aria-required='true'
                   >
                     <option value='COMERCIAL'>Comercial</option>
                     <option value='RESIDENCIAL'>Residencial</option>
@@ -306,10 +327,12 @@ export default function TerrenosPage() {
                 />
 
                 <div className='form-group'>
-                  <label>Metragem total <span className='required-star'>*</span></label>
+                  <label htmlFor='terreno-metragem-total'>Metragem total <span className='required-star' aria-hidden='true'>*</span></label>
                   <MaskedInput
+                    id='terreno-metragem-total'
                     mask='area'
                     required
+                    aria-required='true'
                     value={formTerreno.metragemTotal}
                     onValueChange={(metragemTotal) => setFormTerreno((s) => ({ ...s, metragemTotal }))}
                     placeholder='Ex.: 500,00'
@@ -321,23 +344,27 @@ export default function TerrenosPage() {
                 {formTerreno.tipo === 'COMERCIAL' && (
                   <div className='form-grid-three'>
                     <div className='form-group'>
-                      <label>Vagas de garagem <span className='required-star'>*</span></label>
+                      <label htmlFor='terreno-vagas'>Vagas de garagem <span className='required-star' aria-hidden='true'>*</span></label>
                       <input
+                        id='terreno-vagas'
                         className='input-field'
                         type='number'
                         min='0'
                         required
+                        aria-required='true'
                         value={formTerreno.vagasGaragem}
                         onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))}
                       />
                     </div>
                     <div className='form-group'>
-                      <label>Quantidade de salas <span className='required-star'>*</span></label>
+                      <label htmlFor='terreno-qtd-salas'>Quantidade de salas <span className='required-star' aria-hidden='true'>*</span></label>
                       <input
+                        id='terreno-qtd-salas'
                         className='input-field'
                         type='number'
                         min='0'
                         required
+                        aria-required='true'
                         value={formTerreno.quantidadeSalas}
                         onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
                       />
@@ -347,10 +374,12 @@ export default function TerrenosPage() {
 
                 {formTerreno.tipo === 'RESIDENCIAL' && (
                   <div className='form-group'>
-                    <label>Metragem da casa <span className='required-star'>*</span></label>
+                    <label htmlFor='terreno-metragem-casa'>Metragem da casa <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='terreno-metragem-casa'
                       mask='area'
                       required
+                      aria-required='true'
                       value={formTerreno.metragemCasa}
                       onValueChange={(metragemCasa) => setFormTerreno((s) => ({ ...s, metragemCasa }))}
                       inputMode='decimal'
@@ -359,8 +388,9 @@ export default function TerrenosPage() {
                 )}
 
                 <div className='form-group'>
-                  <label>Observações</label>
+                  <label htmlFor='terreno-observacoes'>Observações</label>
                   <textarea
+                    id='terreno-observacoes'
                     className='textarea-field'
                     rows={4}
                     value={formTerreno.observacoes}
@@ -383,29 +413,14 @@ export default function TerrenosPage() {
       )}
 
       <section className='card'>
+        <div className='table-scroll'>
         <table className='table'>
           <thead>
             <tr>
-              <th>
-                <button type='button' onClick={() => handleSort('tipo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Tipo {sortConfig.key === 'tipo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('endereco')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Endereço {sortConfig.key === 'endereco' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('metragemTotal')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Metragem {sortConfig.key === 'metragemTotal' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('detalhes')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Detalhes {sortConfig.key === 'detalhes' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Tipo' sortKey='tipo' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as TerrenoSortKey)} />
+              <SortableTh label='Endereço' sortKey='endereco' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as TerrenoSortKey)} />
+              <SortableTh label='Metragem' sortKey='metragemTotal' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as TerrenoSortKey)} />
+              <SortableTh label='Detalhes' sortKey='detalhes' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as TerrenoSortKey)} />
               <th>Ações</th>
             </tr>
           </thead>
@@ -440,6 +455,7 @@ export default function TerrenosPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

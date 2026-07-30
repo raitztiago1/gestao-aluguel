@@ -3,6 +3,8 @@ package com.felicioecavalaro.gestao_aluguel.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
 
 import jakarta.persistence.Column;
@@ -102,8 +104,10 @@ public class Contrato {
     private Long createdBy;
 
     @Transient
+    @JsonIgnore
     private boolean emDia;
 
     @Transient
+    @JsonProperty("situacao")
     private String situacao;
 }

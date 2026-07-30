@@ -1,6 +1,7 @@
 package com.felicioecavalaro.gestao_aluguel.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -25,6 +26,7 @@ import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
+import com.felicioecavalaro.gestao_aluguel.dto.ContratoRequestDTO;
 import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
@@ -45,6 +47,31 @@ class ContratoServiceTest {
 
     @InjectMocks
     private ContratoService service;
+
+    private ContratoRequestDTO sampleDto() {
+        Contrato contrato = sampleContrato();
+        return dtoFromContrato(contrato);
+    }
+
+    private ContratoRequestDTO dtoFromContrato(Contrato contrato) {
+        Long salaId = contrato.getSala() != null ? contrato.getSala().getId() : null;
+        Long locatarioId = contrato.getLocatario() != null ? contrato.getLocatario().getId() : null;
+        return new ContratoRequestDTO(
+                salaId,
+                locatarioId,
+                contrato.getDataInicio(),
+                contrato.getDataTermino(),
+                contrato.getValorAluguel(),
+                contrato.getDiaVencimento(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
 
     private Contrato sampleContrato() {
         return Contrato.builder()
@@ -82,13 +109,36 @@ class ContratoServiceTest {
 
     @Test
     void createSavesContrato() {
-        Contrato contrato = sampleContrato();
-        when(repo.save(contrato)).thenReturn(contrato);
+        ContratoRequestDTO dto = sampleDto();
+        Contrato contrato = dto.toEntity();
+        when(repo.save(any(Contrato.class))).thenReturn(contrato);
 
-        Contrato created = service.create(contrato);
+        Contrato created = service.create(dto);
 
         assertEquals(contrato, created);
-        verify(repo).save(contrato);
+        verify(repo).save(any(Contrato.class));
+    }
+
+    @Test
+    void createSavesContratoWithFiadorId() {
+        ContratoRequestDTO dto = new ContratoRequestDTO(
+                1L, 1L,
+                LocalDate.now(),
+                LocalDate.now().plusMonths(12),
+                BigDecimal.valueOf(1500),
+                5,
+                null, null, null, null,
+                StatusContrato.ATIVO,
+                null,
+                99L,
+                null);
+        when(repo.save(any(Contrato.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Contrato created = service.create(dto);
+
+        assertEquals(99L, created.getFiadorId());
+        assertNull(created.getCaucaoId());
+        verify(repo).save(any(Contrato.class));
     }
 
     @Test
@@ -251,34 +301,36 @@ class ContratoServiceTest {
 
         when(repo.findBySalaId(1L)).thenReturn(List.of(existing));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> service.create(contrato));
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> service.create(dtoFromContrato(contrato)));
 
         assertEquals("Sala já possui um contrato ativo no período informado.", exception.getMessage());
     }
 
     @Test
     void updateThrowsWhenNotFound() {
-        Contrato contrato = sampleContrato();
-        when(repo.existsById(1L)).thenReturn(false);
+        ContratoRequestDTO dto = sampleDto();
+        when(repo.findById(1L)).thenReturn(Optional.empty());
 
         EntityNotFoundException exception = assertThrows(EntityNotFoundException.class,
-                () -> service.update(1L, contrato));
+                () -> service.update(1L, dto));
 
         assertEquals("Contrato não encontrado: 1", exception.getMessage());
-        verify(repo).existsById(1L);
+        verify(repo).findById(1L);
     }
 
     @Test
     void updateSavesExistingContrato() {
         Contrato contrato = sampleContrato();
-        when(repo.existsById(1L)).thenReturn(true);
+        ContratoRequestDTO dto = sampleDto();
+        when(repo.findById(1L)).thenReturn(Optional.of(contrato));
         when(repo.save(any(Contrato.class))).thenReturn(contrato);
 
-        Contrato updated = service.update(1L, contrato);
+        Contrato updated = service.update(1L, dto);
 
         assertEquals(contrato, updated);
         assertEquals(1L, updated.getId());
-        verify(repo).existsById(1L);
+        verify(repo).findById(1L);
         verify(repo).save(contrato);
     }
 

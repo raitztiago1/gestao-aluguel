@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { clearSession } from '../lib/session';
 
 type NavItem = {
@@ -24,6 +26,11 @@ type AppHeaderProps = {
 export default function AppHeader({ showLogout = true }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => setMenuOpen(false);
+
+  useEscapeKey(closeMenu, menuOpen);
 
   const logout = () => {
     clearSession();
@@ -41,7 +48,24 @@ export default function AppHeader({ showLogout = true }: AppHeaderProps) {
           />
         </Link>
 
-        <nav className='app-nav' aria-label='Navegação principal'>
+        <button
+          type='button'
+          className='app-nav-toggle'
+          aria-expanded={menuOpen}
+          aria-controls='app-nav-menu'
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span className='app-nav-toggle-label'>{menuOpen ? 'Fechar menu' : 'Menu'}</span>
+          <span className='app-nav-toggle-icon' aria-hidden='true'>
+            {menuOpen ? '✕' : '☰'}
+          </span>
+        </button>
+
+        <nav
+          id='app-nav-menu'
+          className={`app-nav${menuOpen ? ' app-nav--open' : ''}`}
+          aria-label='Navegação principal'
+        >
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -50,6 +74,7 @@ export default function AppHeader({ showLogout = true }: AppHeaderProps) {
                 href={item.href}
                 className={`app-nav-link${isActive ? ' app-nav-link--active' : ''}`}
                 aria-current={isActive ? 'page' : undefined}
+                onClick={closeMenu}
               >
                 {item.label}
               </Link>

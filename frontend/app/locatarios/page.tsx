@@ -5,8 +5,10 @@ import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import SortableTh from '../components/SortableTh';
 import { useCepLookup } from '../hooks/useCepLookup';
 import { useAuthGuard } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -101,6 +103,7 @@ export default function LocatariosPage() {
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [sortConfig, setSortConfig] = useState<{ key: LocatarioSortKey; direction: SortDirection }>({
     key: 'nome',
@@ -113,7 +116,7 @@ export default function LocatariosPage() {
 
   const { handleCepChange, resetCepRef } = useCepLookup({
     onAddressUpdate: updateAddress,
-    onError: (msg) => setErro(msg)
+    onError: (msg) => setErroModal(msg)
   });
 
   useEffect(() => {
@@ -197,6 +200,7 @@ export default function LocatariosPage() {
 
   const salvarLocatario = async (event: FormEvent) => {
     event.preventDefault();
+    setErroModal(null);
     try {
       const payload = {
         tipoPessoa: formLocatario.tipoPessoa,
@@ -235,7 +239,7 @@ export default function LocatariosPage() {
       resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(getErrorMessage(err, 'Falha ao salvar locatário.'));
+      setErroModal(getErrorMessage(err, 'Falha ao salvar locatário.'));
     }
   };
 
@@ -244,6 +248,7 @@ export default function LocatariosPage() {
     setModoEdicao(true);
     setShowModal(true);
     setErro(null);
+    setErroModal(null);
     resetCepRef();
   };
 
@@ -261,15 +266,18 @@ export default function LocatariosPage() {
     setModoEdicao(false);
     setFormLocatario(defaultLocatarioForm);
     setShowModal(false);
-    setErro(null);
+    setErroModal(null);
     resetCepRef();
   };
+
+  useEscapeKey(resetForm, showModal);
 
   const abrirNovaFormulario = () => {
     setModoEdicao(false);
     setFormLocatario(defaultLocatarioForm);
     setShowModal(true);
     setErro(null);
+    setErroModal(null);
     resetCepRef();
   };
 
@@ -344,10 +352,12 @@ export default function LocatariosPage() {
             </div>
 
             <div className='modal-content'>
+              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
               <form onSubmit={salvarLocatario} className='form-grid'>
                 <div className='form-group'>
-                  <label>Tipo de pessoa</label>
+                  <label htmlFor='locatario-tipo'>Tipo de pessoa</label>
                   <select
+                    id='locatario-tipo'
                     className='select-field'
                     value={formLocatario.tipoPessoa}
                     onChange={(e) => {
@@ -359,6 +369,7 @@ export default function LocatariosPage() {
                       }));
                     }}
                     required
+                    aria-required='true'
                   >
                     <option value='FISICA'>Pessoa física</option>
                     <option value='JURIDICA'>Pessoa jurídica</option>
@@ -366,22 +377,29 @@ export default function LocatariosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Nome <span className='required-star'>*</span></label>
+                  <label htmlFor='locatario-nome'>Nome <span className='required-star' aria-hidden='true'>*</span></label>
                   <input
+                    id='locatario-nome'
                     className='input-field'
                     type='text'
                     required
+                    aria-required='true'
                     value={formLocatario.nome}
                     onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
                   />
                 </div>
 
                 <div className='form-group'>
-                  <label>{formLocatario.tipoPessoa === 'JURIDICA' ? 'CNPJ' : 'CPF'} <span className='required-star'>*</span></label>
+                  <label htmlFor='locatario-documento'>
+                    {formLocatario.tipoPessoa === 'JURIDICA' ? 'CNPJ' : 'CPF'}{' '}
+                    <span className='required-star' aria-hidden='true'>*</span>
+                  </label>
                   <MaskedInput
+                    id='locatario-documento'
                     mask='cpfCnpj'
                     tipoPessoa={formLocatario.tipoPessoa}
                     required
+                    aria-required='true'
                     value={formLocatario.cpfCnpj}
                     onValueChange={(cpfCnpj) => setFormLocatario((s) => ({ ...s, cpfCnpj }))}
                     placeholder={formLocatario.tipoPessoa === 'JURIDICA' ? '00.000.000/0000-00' : '000.000.000-00'}
@@ -390,11 +408,13 @@ export default function LocatariosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>E-mail <span className='required-star'>*</span></label>
+                  <label htmlFor='locatario-email'>E-mail <span className='required-star' aria-hidden='true'>*</span></label>
                   <input
+                    id='locatario-email'
                     className='input-field'
                     type='email'
                     required
+                    aria-required='true'
                     value={formLocatario.email}
                     onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
                   />
@@ -402,10 +422,12 @@ export default function LocatariosPage() {
 
                 <div className='form-grid-two'>
                   <div className='form-group'>
-                    <label>Telefone <span className='required-star'>*</span></label>
+                    <label htmlFor='locatario-telefone'>Telefone <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='locatario-telefone'
                       mask='phone'
                       required
+                      aria-required='true'
                       value={formLocatario.telefone}
                       onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
                       placeholder='(00) 0000-0000'
@@ -413,8 +435,9 @@ export default function LocatariosPage() {
                     />
                   </div>
                   <div className='form-group'>
-                    <label>Celular</label>
+                    <label htmlFor='locatario-celular'>Celular</label>
                     <MaskedInput
+                      id='locatario-celular'
                       mask='phone'
                       value={formLocatario.celular}
                       onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
@@ -425,6 +448,7 @@ export default function LocatariosPage() {
                 </div>
 
                 <AddressFields
+                  idPrefix='locatario-endereco'
                   required
                   value={formLocatario}
                   onChange={(patch) => setFormLocatario((s) => ({ ...s, ...patch }))}
@@ -432,8 +456,9 @@ export default function LocatariosPage() {
                 />
 
                 <div className='form-group'>
-                  <label>Observações</label>
+                  <label htmlFor='locatario-observacoes'>Observações</label>
                   <textarea
+                    id='locatario-observacoes'
                     className='textarea-field'
                     rows={4}
                     value={formLocatario.observacoes}
@@ -456,30 +481,15 @@ export default function LocatariosPage() {
       )}
 
       <section className='card'>
+        <div className='table-scroll'>
         <table className='table'>
           <thead>
             <tr>
-              <th>
-                <button type='button' onClick={() => handleSort('nome')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Nome {sortConfig.key === 'nome' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('tipo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Tipo {sortConfig.key === 'tipo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('documento')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Documento {sortConfig.key === 'documento' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Nome' sortKey='nome' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as LocatarioSortKey)} />
+              <SortableTh label='Tipo' sortKey='tipo' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as LocatarioSortKey)} />
+              <SortableTh label='Documento' sortKey='documento' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as LocatarioSortKey)} />
               <th>Contato</th>
-              <th>
-                <button type='button' onClick={() => handleSort('localizacao')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Localização {sortConfig.key === 'localizacao' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Localização' sortKey='localizacao' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as LocatarioSortKey)} />
               <th>Ações</th>
             </tr>
           </thead>
@@ -514,6 +524,7 @@ export default function LocatariosPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

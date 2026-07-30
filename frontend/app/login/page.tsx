@@ -61,25 +61,29 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className='form-grid'>
           <div className='form-group'>
-            <label>Email</label>
+            <label htmlFor='login-email'>Email</label>
             <input
+              id='login-email'
               className='input-field'
               type='email'
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-required='true'
               disabled={loading}
             />
           </div>
 
           <div className='form-group'>
-            <label>Senha</label>
+            <label htmlFor='login-senha'>Senha</label>
             <input
+              id='login-senha'
               className='input-field'
               type='password'
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               required
+              aria-required='true'
               disabled={loading}
             />
           </div>

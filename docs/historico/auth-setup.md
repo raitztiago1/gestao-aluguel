@@ -1,5 +1,7 @@
 # 🔐 Sistema de Autenticação - Guia Completo
 
+> **Nota (2026-07-30):** documento arquivado em `docs/historico/`. A tabela `usuario` é criada em `V1__init.sql`; a migration redundante `V2__create_usuario_table.sql` foi removida na limpeza Flyway. Ver README para fluxo operacional atual.
+
 ## Visão Geral
 
 O sistema foi implementado com **autenticação funcional 100%**, incluindo:

@@ -20,40 +20,52 @@ public class RateLimiter {
 
     private final Map<String, LoginAttempt> loginAttempts = new ConcurrentHashMap<>();
 
-    public void recordAttempt(String email) {
-        LoginAttempt attempt = loginAttempts.computeIfAbsent(email, k -> new LoginAttempt());
+    public void recordAttempt(String key) {
+        recordAttempt(key, maxAttempts);
+    }
+
+    public void recordAttempt(String key, int maxAttemptsLimit) {
+        LoginAttempt attempt = loginAttempts.computeIfAbsent(key, k -> new LoginAttempt());
         attempt.recordAttempt();
-        if (attempt.isLocked(maxAttempts)) {
-            log.warn("Conta bloqueada por tentativas inválidas: {}", email);
+        if (attempt.isLocked(maxAttemptsLimit)) {
+            log.warn("Chave bloqueada por excesso de tentativas: {}", key);
         }
     }
 
-    public void recordSuccess(String email) {
-        loginAttempts.remove(email);
+    public void recordSuccess(String key) {
+        loginAttempts.remove(key);
     }
 
-    public boolean isLocked(String email) {
-        LoginAttempt attempt = loginAttempts.get(email);
+    public boolean isLocked(String key) {
+        return isLocked(key, maxAttempts, lockDurationMinutes);
+    }
+
+    public boolean isLocked(String key, int maxAttemptsLimit, int lockDurationMinutesLimit) {
+        LoginAttempt attempt = loginAttempts.get(key);
         if (attempt == null) {
             return false;
         }
-        if (attempt.isExpired(lockDurationMinutes)) {
-            loginAttempts.remove(email);
+        if (attempt.isExpired(lockDurationMinutesLimit)) {
+            loginAttempts.remove(key);
             return false;
         }
-        return attempt.isLocked(maxAttempts);
+        return attempt.isLocked(maxAttemptsLimit);
     }
 
-    public String getLockTimeRemaining(String email) {
-        LoginAttempt attempt = loginAttempts.get(email);
+    public String getLockTimeRemaining(String key) {
+        return getLockTimeRemaining(key, lockDurationMinutes);
+    }
+
+    public String getLockTimeRemaining(String key, int lockDurationMinutesLimit) {
+        LoginAttempt attempt = loginAttempts.get(key);
         if (attempt == null) {
             return null;
         }
-        if (attempt.isExpired(lockDurationMinutes)) {
-            loginAttempts.remove(email);
+        if (attempt.isExpired(lockDurationMinutesLimit)) {
+            loginAttempts.remove(key);
             return null;
         }
-        long minutesRemaining = attempt.getMinutesRemaining(lockDurationMinutes);
+        long minutesRemaining = attempt.getMinutesRemaining(lockDurationMinutesLimit);
         return String.format("Conta temporariamente bloqueada. Tente novamente em %d minuto(s).", minutesRemaining);
     }
 

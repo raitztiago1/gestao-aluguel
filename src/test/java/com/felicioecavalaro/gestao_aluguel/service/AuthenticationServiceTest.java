@@ -3,26 +3,33 @@ package com.felicioecavalaro.gestao_aluguel.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.felicioecavalaro.gestao_aluguel.domain.model.Usuario;
+import com.felicioecavalaro.gestao_aluguel.dto.ForgotPasswordRequest;
 import com.felicioecavalaro.gestao_aluguel.dto.LoginRequest;
 import com.felicioecavalaro.gestao_aluguel.dto.LoginResponse;
 import com.felicioecavalaro.gestao_aluguel.dto.RegisterRequest;
 import com.felicioecavalaro.gestao_aluguel.exception.AuthenticationException;
 import com.felicioecavalaro.gestao_aluguel.exception.DuplicateResourceException;
 import com.felicioecavalaro.gestao_aluguel.exception.InvalidInputException;
+import com.felicioecavalaro.gestao_aluguel.exception.RegistrationDisabledException;
 import com.felicioecavalaro.gestao_aluguel.repository.UsuarioRepository;
 import com.felicioecavalaro.gestao_aluguel.security.InputSanitizer;
 import com.felicioecavalaro.gestao_aluguel.security.PasswordValidator;
@@ -54,6 +61,13 @@ class AuthenticationServiceTest {
 
     @InjectMocks
     private AuthenticationService authenticationService;
+
+    @BeforeEach
+    void setup() {
+        ReflectionTestUtils.setField(authenticationService, "registrationEnabled", true);
+        ReflectionTestUtils.setField(authenticationService, "forgotPasswordMaxAttempts", 5);
+        ReflectionTestUtils.setField(authenticationService, "forgotPasswordLockDurationMinutes", 15);
+    }
 
     private Usuario sampleUsuario() {
         return Usuario.builder()
@@ -116,6 +130,22 @@ class AuthenticationServiceTest {
         assertEquals(token, response.getToken());
         assertEquals(usuario.getId(), response.getUsuarioId());
         verify(rateLimiter).recordSuccess("test@test.com");
+    }
+
+    @Test
+    void registerThrowsWhenRegistrationDisabled() {
+        ReflectionTestUtils.setField(authenticationService, "registrationEnabled", false);
+
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("newuser@test.com");
+        request.setNomeCompleto("New User");
+        request.setSenha("StrongPassword123!");
+
+        RegistrationDisabledException exception = assertThrows(RegistrationDisabledException.class,
+                () -> authenticationService.register(request));
+
+        assertEquals("Cadastro público desabilitado.", exception.getMessage());
+        verify(usuarioRepository, never()).existsByEmail(anyString());
     }
 
     @Test
@@ -199,5 +229,56 @@ class AuthenticationServiceTest {
         Usuario result = authenticationService.findByEmail("test@test.com");
 
         assertEquals(usuario, result);
+    }
+
+    @Test
+    void requestPasswordResetThrowsWhenRateLimited() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("test@test.com");
+
+        when(inputSanitizer.sanitizeEmail(anyString())).thenReturn("test@test.com");
+        when(rateLimiter.isLocked(eq("forgot:test@test.com"), eq(5), eq(15))).thenReturn(true);
+        when(rateLimiter.getLockTimeRemaining(eq("forgot:test@test.com"), eq(15)))
+                .thenReturn("Conta temporariamente bloqueada. Tente novamente em 10 minuto(s).");
+
+        AuthenticationException exception = assertThrows(AuthenticationException.class,
+                () -> authenticationService.requestPasswordReset(request));
+
+        assertEquals("Conta temporariamente bloqueada. Tente novamente em 10 minuto(s).", exception.getMessage());
+        verify(rateLimiter, never()).recordAttempt(anyString(), anyInt());
+        verify(usuarioRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void requestPasswordResetRecordsAttemptForUnknownEmail() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("unknown@test.com");
+
+        when(inputSanitizer.sanitizeEmail(anyString())).thenReturn("unknown@test.com");
+        when(rateLimiter.isLocked(eq("forgot:unknown@test.com"), eq(5), eq(15))).thenReturn(false);
+        when(usuarioRepository.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
+
+        authenticationService.requestPasswordReset(request);
+
+        verify(rateLimiter).recordAttempt("forgot:unknown@test.com", 5);
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void requestPasswordResetSendsEmailForExistingUser() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("test@test.com");
+
+        Usuario usuario = sampleUsuario();
+
+        when(inputSanitizer.sanitizeEmail(anyString())).thenReturn("test@test.com");
+        when(rateLimiter.isLocked(eq("forgot:test@test.com"), eq(5), eq(15))).thenReturn(false);
+        when(usuarioRepository.findByEmail("test@test.com")).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.save(org.mockito.ArgumentMatchers.any())).thenReturn(usuario);
+
+        authenticationService.requestPasswordReset(request);
+
+        verify(rateLimiter).recordAttempt("forgot:test@test.com", 5);
+        verify(emailService).sendPasswordResetEmail(eq("test@test.com"), eq("Test User"), anyString());
     }
 }

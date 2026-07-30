@@ -49,7 +49,7 @@ public class ContratoDocumentoController {
             var documento = doc.get();
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + documento.getNomeArquivo() + "\"")
+                            "attachment; filename=\"" + ContratoDocumentoService.sanitizeFilename(documento.getNomeArquivo()) + "\"")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(documento.getConteudo());
         } catch (Exception e) {

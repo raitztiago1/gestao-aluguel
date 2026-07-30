@@ -66,6 +66,90 @@ A inteligência de dados está centralizada no esquema SQL (`V1__init.sql`), gar
 - **BCrypt**: Senhas são criptografadas antes de serem persistidas.
 - **Proteção de Rotas**: O frontend verifica a validade da sessão (`isSessionValid`) em cada carregamento de página protegida.
 - **Global Exception Handler**: Centraliza erros de integridade (ex: tentativa de excluir registro com vínculo) e retorna mensagens amigáveis ao usuário final.
+- **Profiles Spring**: em desenvolvimento local o profile padrão é `dev` (habilita endpoints `/api/test/**`). Em produção use `prod` — endpoints de teste ficam indisponíveis e o cadastro público é desabilitado por padrão.
+
+### Variáveis de ambiente
+
+Configure estas variáveis no deploy ou em um arquivo `.env` local **não versionado**. Valores abaixo são apenas referência — nunca commite segredos reais.
+
+| Variável | Obrigatória em prod | Descrição |
+|----------|---------------------|-----------|
+| `APP_JWT_SECRET` | Sim | Chave HS512 com **≥ 64 caracteres**. Usada para assinar tokens JWT. |
+| `SPRING_DATASOURCE_URL` | Sim | URL JDBC do PostgreSQL (ex.: `jdbc:postgresql://host:5432/gestao_aluguel`). |
+| `SPRING_DATASOURCE_USERNAME` | Recomendado | Usuário do banco. |
+| `SPRING_DATASOURCE_PASSWORD` | Sim | Senha do banco. |
+| `SPRING_PROFILES_ACTIVE` | Sim | `prod` em deploy; `dev` para desenvolvimento local (habilita seed via `/api/test`). |
+| `SPRING_MAIL_HOST` | Opcional | Host SMTP para e-mails de reset de senha e lembretes. |
+| `SPRING_MAIL_USERNAME` | Opcional | Usuário SMTP. |
+| `SPRING_MAIL_PASSWORD` | Opcional | Senha SMTP. |
+
+**Desenvolvimento local:** o `application.properties` define `spring.profiles.active=dev` e fornece defaults seguros apenas para máquina local (JWT e PostgreSQL em localhost). Não use esses defaults em produção.
+
+**Produção:** ative o profile `prod` (`application-prod.properties`) e defina todas as variáveis obrigatórias. O boot falha se `APP_JWT_SECRET` estiver ausente ou inválido. O cadastro público (`POST /api/auth/register`) fica desabilitado (`app.auth.registration-enabled=false`).
+
+### Fluxo de autenticação
+
+- **Login:** `POST /api/auth/login` — retorna JWT (validade 24 h); frontend persiste token em `localStorage`.
+- **Registro:** `POST /api/auth/register` — disponível apenas com profile `dev` ou quando `app.auth.registration-enabled=true`.
+- **Recuperação de senha:** `POST /api/auth/forgot-password` e `POST /api/auth/reset-password`.
+- **Rotas protegidas:** header `Authorization: Bearer <token>`; filtro JWT valida em cada requisição.
+
+Detalhes históricos e guia expandido: [docs/historico/auth-setup.md](docs/historico/auth-setup.md).
+
+---
+
+## 🧪 Testes
+
+Verificação da suite completa (backend):
+
+```powershell
+.\mvnw.cmd test
+```
+
+Frontend (lint e build):
+
+```powershell
+cd frontend
+npm run lint
+npm run build
+```
+
+A contagem de testes é dinâmica — use o comando acima ou o pipeline de CI como fonte de verdade. Referência de testes de segurança: [docs/testes/seguranca.md](docs/testes/seguranca.md).
+
+---
+
+## 📜 Scripts de desenvolvimento
+
+Scripts SQL úteis em `scripts/dev/` (executar com `psql` local ou via Docker):
+
+| Script | Uso |
+|--------|-----|
+| [seed-test-data.sql](scripts/dev/seed-test-data.sql) | Insere locatário e contrato de exemplo para QA manual |
+| [test-query.sql](scripts/dev/test-query.sql) | Lista últimos documentos de contrato |
+| [check-db.sql](scripts/dev/check-db.sql) | Verifica existência e dados da tabela `contrato_documento` |
+| [check-flyway-history.sql](scripts/dev/check-flyway-history.sql) | Audita histórico Flyway (versões 1, 3, 4, 5, 6) |
+
+Exemplo com Docker:
+
+```powershell
+docker exec -i gestao-aluguel-db psql -U postgres -d gestao_aluguel -f - < scripts/dev/check-flyway-history.sql
+```
+
+---
+
+## 📚 Documentação
+
+| Path | Conteúdo |
+|------|----------|
+| [docs/historico/](docs/historico/) | Revisão de usabilidade, plano de testes inicial, guia de auth legado |
+| [docs/testes/seguranca.md](docs/testes/seguranca.md) | Referência de testes de segurança (pós-hardening) |
+| [docs/manual/](docs/manual/) | Manual imprimível para usuários finais |
+
+Specs e reviews ativas: `specs/`, `reviews/`, `ideas/`.
+
+### Roadmap — domínio incompleto
+
+Entidades e repositórios stub mantidos intencionalmente para features futuras (`Fiador`, `Caucao`, `ConfiguracaoLocador`). Ver [ideas/mapeamento-features-sistema.md](ideas/mapeamento-features-sistema.md).
 
 ---
 

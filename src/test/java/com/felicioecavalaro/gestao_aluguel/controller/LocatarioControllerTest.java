@@ -64,4 +64,19 @@ class LocatarioControllerTest {
         assertEquals(locatario, result);
         verify(service).create(locatario);
     }
+
+    @Test
+    void createReturnsLocatarioWithDocumentosJson() {
+        Locatario locatario = Locatario.builder()
+                .id(2L)
+                .nome("Locatário com docs")
+                .documentos("{\"cpf_scan\":\"ok\"}")
+                .build();
+        when(service.create(locatario)).thenReturn(locatario);
+
+        Locatario result = controller.create(locatario);
+
+        assertEquals("{\"cpf_scan\":\"ok\"}", result.getDocumentos());
+        verify(service).create(locatario);
+    }
 }

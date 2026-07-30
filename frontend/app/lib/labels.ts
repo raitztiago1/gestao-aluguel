@@ -17,8 +17,7 @@ const STATUS_SALA: Record<string, string> = {
 const STATUS_CONTRATO: Record<string, string> = {
   ATIVO: 'Ativo',
   ENCERRADO: 'Encerrado',
-  RENOVACAO: 'Em renovação',
-  CANCELADO: 'Cancelado'
+  RENOVADO: 'Renovado'
 };
 
 function lookup(map: Record<string, string>, key?: string | null, fallback = '—'): string {
@@ -48,10 +47,9 @@ export function badgeClassForStatus(key?: string | null): string {
     case 'DISPONIVEL':
       return 'badge badge-success';
     case 'LOCADA':
-    case 'RENOVACAO':
+    case 'RENOVADO':
       return 'badge badge-warning';
     case 'ENCERRADO':
-    case 'CANCELADO':
     case 'MANUTENCAO':
       return 'badge badge-danger';
     default:

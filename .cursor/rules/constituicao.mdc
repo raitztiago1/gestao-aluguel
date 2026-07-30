@@ -1,0 +1,87 @@
+---
+description: Stack, comandos de teste e convenções do projeto Gestão de Aluguel
+alwaysApply: true
+---
+
+# Constituição — Gestão de Aluguel
+
+Referência de contexto para skills spec-driven e implementação neste workspace.
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|------------|
+| Backend | Java 25, Spring Boot 4, Spring Security JWT, JPA/Hibernate |
+| Frontend | Next.js 14 (App Router), React 18, TypeScript 5 |
+| Banco | PostgreSQL 15+, Flyway migrations em `src/main/resources/db/migration/` |
+| Build backend | Maven (`mvnw.cmd` na raiz) |
+| Build frontend | npm em `frontend/` |
+
+## Estrutura principal
+
+```text
+src/main/java/com/felicioecavalaro/gestao_aluguel/
+  controller/   service/   repository/   domain/model/   dto/   security/
+frontend/app/
+  components/   lib/   [entidade]/page.tsx
+```
+
+## Comandos de verificação
+
+```powershell
+# Backend — suite completa
+.\mvnw.cmd test
+
+# Backend — classe ou pacote específico
+.\mvnw.cmd "-Dtest=ContratoServiceTest" test
+.\mvnw.cmd "-Dtest=ContratoControllerTest" test
+
+# Backend — compilar sem testes
+.\mvnw.cmd clean compile
+
+# Frontend — lint
+cd frontend; npm run lint
+
+# Frontend — build de produção
+cd frontend; npm run build
+```
+
+**Nota:** o frontend ainda não tem testes automatizados (`npm test` não existe). Para tasks de UI, usar lint + build e verificação manual.
+
+## Execução local
+
+```powershell
+.\mvnw.cmd spring-boot:run          # API em http://localhost:8080
+cd frontend; npm run dev              # UI em http://localhost:3000
+```
+
+## Regras de negócio críticas
+
+- **Garantia XOR**: contrato exige Fiador **ou** Caução — nunca ambos, nunca nenhum.
+- **Terreno**: `COMERCIAL` vs `RESIDENCIAL` com validações distintas (campos, salas, vagas).
+- **Locatário**: PF e PJ com campos obrigatórios diferentes (validação em banco e serviço).
+- **Cobranças**: trigger gera parcelas ao criar contrato; inadimplência atualizada por trigger.
+- **Configuração locador**: singleton (`id=1`).
+
+## Convenções de código
+
+- Backend: Lombok, DTOs para request/response, exceções em `exception/`, handler global.
+- Frontend: componentes reutilizáveis em `components/`, labels em `lib/labels.ts`, formatação em `lib/format.ts`.
+- Idioma da UI e mensagens: **português (Brasil)**.
+- Commits e PRs: só quando o humano pedir explicitamente.
+
+## Gates antes de "pronto"
+
+1. Testes backend relevantes passando (`.\mvnw.cmd test` ou classe alvo).
+2. Se tocou frontend: `npm run lint` (e `npm run build` se mudança estrutural).
+3. Para feature com spec: validar contra `specs/<feature>/about.md` com skill `spec-validator`.
+
+## Artefactos spec-driven (paths relativos ao workspace)
+
+| Artefacto | Path |
+|-----------|------|
+| Ideia | `ideas/[nome].md` |
+| Spec | `specs/[feature]/about.md` |
+| Plano | `specs/[feature]/plan.md` |
+| Review compliance | `reviews/[feature]-YYYY-MM-DD.md` |
+| Progresso SDD | `.cursor/sdd/progress.md` |

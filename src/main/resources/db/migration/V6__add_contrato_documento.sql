@@ -1,4 +1,4 @@
--- Migration V2: adiciona tabela para armazenar PDF do contrato
+-- Migration V6: adiciona tabela para armazenar PDF do contrato
 CREATE TABLE contrato_documento (
     id SERIAL PRIMARY KEY,
     contrato_id INTEGER NOT NULL REFERENCES contrato(id) ON DELETE CASCADE,
