@@ -27,6 +27,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
+import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Usuario;
 import com.felicioecavalaro.gestao_aluguel.repository.UsuarioRepository;
 import com.felicioecavalaro.gestao_aluguel.service.ContratoService;
@@ -88,6 +90,22 @@ class SecurityFilterChainIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
+    }
+
+    @Test
+    @DisplayName("T2b: GET /api/contratos inclui campo situacao no JSON")
+    void contratosResponseIncludesSituacao() throws Exception {
+        Contrato contrato = Contrato.builder()
+                .id(1L)
+                .status(StatusContrato.ATIVO)
+                .build();
+        contrato.setSituacao("EM_DIA");
+        when(contratoService.findAll()).thenReturn(List.of(contrato));
+
+        mockMvc.perform(get("/api/contratos")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].situacao").value("EM_DIA"));
     }
 
     @Test

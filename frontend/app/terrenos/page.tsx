@@ -200,6 +200,19 @@ export default function TerrenosPage() {
 
   useEscapeKey(resetForm, showModal);
 
+  const handleTipoChange = (novoTipo: TipoTerreno) => {
+    setFormTerreno((s) => {
+      const patch: Partial<TerrenoForm> = { tipo: novoTipo };
+      if (s.tipo === 'COMERCIAL') {
+        patch.vagasGaragem = '';
+        patch.quantidadeSalas = '';
+      } else if (s.tipo === 'RESIDENCIAL') {
+        patch.metragemCasa = '';
+      }
+      return { ...s, ...patch };
+    });
+  };
+
   const handleSort = (key: TerrenoSortKey) => {
     setSortConfig((current) => ({
       key,
@@ -297,7 +310,7 @@ export default function TerrenosPage() {
                     id='terreno-tipo'
                     className='select-field'
                     value={formTerreno.tipo}
-                    onChange={(e) => setFormTerreno((s) => ({ ...s, tipo: e.target.value as TipoTerreno }))}
+                    onChange={(e) => handleTipoChange(e.target.value as TipoTerreno)}
                     required
                     aria-required='true'
                   >

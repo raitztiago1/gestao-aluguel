@@ -311,6 +311,11 @@ body {
   background: linear-gradient(180deg, #f5f5f5 0%, #ececec 100%);
 }
 
+.summary-card-warning {
+  border-color: #ffdfb6;
+  background: linear-gradient(180deg, #fff8e6 0%, #fff3d6 100%);
+}
+
 .summary-label {
   margin: 0;
   color: #475569;
@@ -528,6 +533,103 @@ body {
   font-size: 0.8rem;
   color: #64748b;
   line-height: 1.35;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.checkbox-label input:disabled {
+  cursor: not-allowed;
+}
+
+.form-info-box {
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #dfe3e8;
+  color: #475569;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.form-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.form-status-header h3 {
+  margin: 0;
+}
+
+.form-toggle-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid #dfe3e8;
+  border-radius: 0.85rem;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.form-toggle-card:hover:not(.form-toggle-card-disabled) {
+  border-color: #3d3d3d;
+  background: #fafafa;
+}
+
+.form-toggle-card:focus-within:not(.form-toggle-card-disabled) {
+  border-color: #0f62fe;
+  box-shadow: 0 0 0 4px rgba(15, 98, 254, 0.12);
+}
+
+.form-toggle-card-active {
+  border-color: #0f62fe;
+  background: #f0f6ff;
+}
+
+.form-toggle-card-disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.form-toggle-card input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: #0f62fe;
+  cursor: inherit;
+}
+
+.form-toggle-card-content {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.form-toggle-card-title {
+  font-weight: 600;
+  color: #102a43;
+}
+
+.form-toggle-card-description {
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.form-section .form-grid {
+  gap: 1rem;
 }
 
 .table-empty {

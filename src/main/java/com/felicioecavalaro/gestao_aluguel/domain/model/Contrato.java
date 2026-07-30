@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusContrato;
 
 import jakarta.persistence.Column;
@@ -107,6 +108,6 @@ public class Contrato {
     private boolean emDia;
 
     @Transient
-    @JsonIgnore
+    @JsonProperty("situacao")
     private String situacao;
 }

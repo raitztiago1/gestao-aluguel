@@ -113,10 +113,14 @@ export default function SalasPage() {
   const salvarSala = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      const status = modoEdicao
+        ? formSala.status
+        : 'DISPONIVEL';
+
       const payload = {
         identificacao: formSala.identificacao.trim(),
         metragem: parseArea(formSala.metragem),
-        status: formSala.status,
+        status,
         observacoes: formSala.observacoes.trim() || undefined,
         terreno: { id: Number(formSala.terrenoId) }
       };
@@ -243,7 +247,11 @@ export default function SalasPage() {
             <div className='modal-header'>
               <div>
                 <h2>{modoEdicao ? 'Editar sala' : 'Nova sala'}</h2>
-                <p className='modal-description'>Informe identificação, metragem, status e terreno.</p>
+                <p className='modal-description'>
+                  {modoEdicao
+                    ? 'Atualize os dados da sala ou altere o status de manutenção.'
+                    : 'Selecione o terreno e informe a identificação e metragem da sala.'}
+                </p>
               </div>
               <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
             </div>
@@ -251,80 +259,130 @@ export default function SalasPage() {
             <div className='modal-content'>
               {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
               <form onSubmit={salvarSala} className='form-grid'>
-                <div className='form-group'>
-                  <label htmlFor='sala-terreno'>Terreno <span className='required-star' aria-hidden='true'>*</span></label>
-                  <select
-                    id='sala-terreno'
-                    className='select-field'
-                    required
-                    aria-required='true'
-                    value={formSala.terrenoId}
-                    onChange={(e) => setFormSala((s) => ({ ...s, terrenoId: e.target.value }))}
-                  >
-                    <option value=''>Selecione o terreno</option>
-                    {terrenosDisponiveisParaSala.map((terreno) => (
-                      <option key={terreno.id} value={terreno.id}>
-                        {formatTerrenoOption(terreno)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <section className='form-section' aria-labelledby='sala-dados-heading'>
+                  <h3 id='sala-dados-heading'>Dados da sala</h3>
+                  <div className='form-grid'>
+                    <div className='form-group'>
+                      <label htmlFor='sala-terreno'>Terreno <span className='required-star' aria-hidden='true'>*</span></label>
+                      <select
+                        id='sala-terreno'
+                        className='select-field'
+                        required
+                        aria-required='true'
+                        value={formSala.terrenoId}
+                        onChange={(e) => setFormSala((s) => ({ ...s, terrenoId: e.target.value }))}
+                      >
+                        <option value=''>Selecione o terreno</option>
+                        {terrenosDisponiveisParaSala.map((terreno) => (
+                          <option key={terreno.id} value={terreno.id}>
+                            {formatTerrenoOption(terreno)}
+                          </option>
+                        ))}
+                      </select>
+                      {!modoEdicao && terrenosDisponiveisParaSala.length === 0 && (
+                        <span className='field-hint'>
+                          Nenhum terreno disponível. Cadastre um terreno comercial ou residencial sem sala vinculada.
+                        </span>
+                      )}
+                    </div>
 
-                <div className='form-group'>
-                  <label htmlFor='sala-identificacao'>Identificação <span className='required-star' aria-hidden='true'>*</span></label>
-                  <input
-                    id='sala-identificacao'
-                    className='input-field'
-                    type='text'
-                    required
-                    aria-required='true'
-                    placeholder='Ex.: Sala 101, Bloco A'
-                    value={formSala.identificacao}
-                    onChange={(e) => setFormSala((s) => ({ ...s, identificacao: e.target.value }))}
-                  />
-                </div>
+                    <div className='form-grid-two'>
+                      <div className='form-group'>
+                        <label htmlFor='sala-identificacao'>
+                          Identificação <span className='required-star' aria-hidden='true'>*</span>
+                        </label>
+                        <input
+                          id='sala-identificacao'
+                          className='input-field'
+                          type='text'
+                          required
+                          aria-required='true'
+                          placeholder='Ex.: Sala 101, Bloco A'
+                          value={formSala.identificacao}
+                          onChange={(e) => setFormSala((s) => ({ ...s, identificacao: e.target.value }))}
+                        />
+                        <span className='field-hint'>Nome ou código para localizar a sala no terreno.</span>
+                      </div>
 
-                <div className='form-group'>
-                  <label htmlFor='sala-metragem'>Metragem (m²) <span className='required-star' aria-hidden='true'>*</span></label>
-                  <MaskedInput
-                    id='sala-metragem'
-                    mask='area'
-                    required
-                    aria-required='true'
-                    value={formSala.metragem}
-                    onValueChange={(metragem) => setFormSala((s) => ({ ...s, metragem }))}
-                    placeholder='Ex.: 45,00'
-                    inputMode='decimal'
-                  />
-                </div>
+                      <div className='form-group'>
+                        <label htmlFor='sala-metragem'>
+                          Metragem (m²) <span className='required-star' aria-hidden='true'>*</span>
+                        </label>
+                        <MaskedInput
+                          id='sala-metragem'
+                          mask='area'
+                          required
+                          aria-required='true'
+                          value={formSala.metragem}
+                          onValueChange={(metragem) => setFormSala((s) => ({ ...s, metragem }))}
+                          placeholder='Ex.: 45,00'
+                          inputMode='decimal'
+                        />
+                        <span className='field-hint'>Área útil da sala em metros quadrados.</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
 
-                <div className='form-group'>
-                  <label htmlFor='sala-status'>Status</label>
-                  <select
-                    id='sala-status'
-                    className='select-field'
-                    value={formSala.status}
-                    onChange={(e) => setFormSala((s) => ({ ...s, status: e.target.value as TipoSalaStatus }))}
-                  >
-                    <option value='DISPONIVEL'>Disponível</option>
-                    <option value='LOCADA'>Locada</option>
-                    <option value='MANUTENCAO'>Em manutenção</option>
-                  </select>
-                </div>
+                {modoEdicao && (
+                  <section className='form-section' aria-labelledby='sala-status-heading'>
+                    <div className='form-status-header'>
+                      <h3 id='sala-status-heading'>Status da sala</h3>
+                      <StatusBadge kind='sala' status={formSala.status} />
+                    </div>
 
-                <div className='form-group'>
-                  <label htmlFor='sala-observacoes'>Observações</label>
-                  <textarea
-                    id='sala-observacoes'
-                    className='textarea-field'
-                    rows={4}
-                    value={formSala.observacoes}
-                    onChange={(e) => setFormSala((s) => ({ ...s, observacoes: e.target.value }))}
-                  />
-                </div>
+                    {formSala.status === 'LOCADA' ? (
+                      <p className='form-info-box'>
+                        Esta sala está vinculada a um contrato ativo. O status é atualizado automaticamente pelo sistema.
+                      </p>
+                    ) : (
+                      <label
+                        className={`form-toggle-card${formSala.status === 'MANUTENCAO' ? ' form-toggle-card-active' : ''}`}
+                        htmlFor='sala-em-manutencao'
+                      >
+                        <input
+                          id='sala-em-manutencao'
+                          type='checkbox'
+                          checked={formSala.status === 'MANUTENCAO'}
+                          onChange={(e) =>
+                            setFormSala((s) => ({
+                              ...s,
+                              status: e.target.checked ? 'MANUTENCAO' : 'DISPONIVEL'
+                            }))
+                          }
+                        />
+                        <span className='form-toggle-card-content'>
+                          <span className='form-toggle-card-title'>Em manutenção</span>
+                          <span className='form-toggle-card-description'>
+                            Salas em manutenção não aparecem na seleção de novos contratos e são exibidas no painel inicial.
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                  </section>
+                )}
+
+                <section className='form-section' aria-labelledby='sala-observacoes-heading'>
+                  <h3 id='sala-observacoes-heading'>Observações</h3>
+                  <div className='form-group'>
+                    <textarea
+                      id='sala-observacoes'
+                      className='textarea-field'
+                      rows={4}
+                      aria-labelledby='sala-observacoes-heading'
+                      placeholder='Informações adicionais sobre a sala (opcional)'
+                      value={formSala.observacoes}
+                      onChange={(e) => setFormSala((s) => ({ ...s, observacoes: e.target.value }))}
+                    />
+                  </div>
+                </section>
 
                 <div className='form-actions'>
-                  <button type='submit' className='button button-primary'>
+                  <button
+                    type='submit'
+                    className='button button-primary'
+                    disabled={!modoEdicao && terrenosDisponiveisParaSala.length === 0}
+                  >
                     {modoEdicao ? 'Salvar alterações' : 'Cadastrar sala'}
                   </button>
                   <button type='button' className='button button-secondary' onClick={resetForm}>

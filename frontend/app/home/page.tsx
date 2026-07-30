@@ -54,7 +54,7 @@ type Contrato = {
   locatario?: { nome?: string };
 };
 
-type ModalType = 'terrenos' | 'contratos' | 'salas' | 'pagamentos' | null;
+type ModalType = 'terrenos' | 'contratos' | 'salas' | 'salas-manutencao' | 'pagamentos' | null;
 
 type Cobranca = {
   id: number;
@@ -429,13 +429,13 @@ export default function Home() {
 
   const getSituacaoContrato = (contrato: Contrato) => {
     if (contrato.status !== 'ATIVO') {
-      return { label: 'Em aberto', className: 'badge badge-warning' };
+      return { label: '—', className: '' };
     }
 
-    const situacao = contrato.situacao || 'EM_ABERTO';
+    const situacao = contrato.situacao ?? 'EM_ABERTO';
 
     if (situacao === 'EM_DIA') {
-      return { label: 'Em dia', className: 'badge badge-success' };
+      return { label: 'Pago', className: 'badge badge-success' };
     }
     if (situacao === 'EM_ATRASO') {
       return { label: 'Em atraso', className: 'badge badge-danger' };
@@ -455,6 +455,7 @@ export default function Home() {
   const contratosEmAtraso = contratos.filter(verificarAtraso);
   const contratosAtivos = contratos.filter((c) => c.status === 'ATIVO');
   const salasDisponiveis = salas.filter((s) => s.status === 'DISPONIVEL');
+  const salasEmManutencao = salas.filter((s) => s.status === 'MANUTENCAO');
 
   if (authStatus !== 'authenticated') {
     return <div className='alert-card'>Redirecionando para login...</div>;
@@ -483,6 +484,17 @@ export default function Home() {
           <strong className='summary-value'>{salasDisponiveisCount}</strong>
           <span className='summary-action-text'>Ver detalhes</span>
         </button>
+        {salasEmManutencao.length > 0 && (
+          <button
+            type='button'
+            className='summary-card summary-card-warning summary-action-card'
+            onClick={() => setSelectedModal('salas-manutencao')}
+          >
+            <p className='summary-label'>Salas em manutenção</p>
+            <strong className='summary-value'>{salasEmManutencao.length}</strong>
+            <span className='summary-action-text'>Ver detalhes</span>
+          </button>
+        )}
       </section>
 
       {selectedModal && selectedModal !== 'pagamentos' && (
@@ -494,6 +506,7 @@ export default function Home() {
                   {selectedModal === 'terrenos' && 'Terrenos cadastrados'}
                   {selectedModal === 'contratos' && 'Contratos ativos'}
                   {selectedModal === 'salas' && 'Salas disponíveis'}
+                  {selectedModal === 'salas-manutencao' && 'Salas em manutenção'}
                 </h2>
                 <p className='modal-description'>Resumo atualizado do seu portfólio.</p>
               </div>
@@ -599,6 +612,31 @@ export default function Home() {
                       </table>
                     </div>
                   )}
+                </div>
+              )}
+
+              {selectedModal === 'salas-manutencao' && (
+                <div className='modal-section'>
+                  <div className='table-scroll'>
+                    <table className='table'>
+                      <thead>
+                        <tr>
+                          <th>Sala</th>
+                          <th>Metragem</th>
+                          <th>Terreno</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salasEmManutencao.map((sala) => (
+                          <tr key={sala.id}>
+                            <td>{sala.identificacao || '—'}</td>
+                            <td>{formatArea(sala.metragem)}</td>
+                            <td>{sala.terreno ? formatAddressLine(sala.terreno) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -786,18 +824,20 @@ export default function Home() {
           </div>
         </div>
       )}
-        <div className='alert-card alert-warning'>
-          <h3>Contratos em atraso</h3>
-          <p>Existem {contratosEmAtraso.length} contrato(s) com pagamento em atraso.</p>
-          <ul>
-            {contratosEmAtraso.map((contrato) => (
-              <li key={contrato.id}>
-                <strong>{contrato.locatario?.nome || 'Locatário'}</strong> — {contrato.sala?.identificacao || 'Sala'}{' '}
-                ({contrato.sala?.terreno ? formatAddressLine(contrato.sala.terreno) : 'endereço não informado'})
-              </li>
-            ))}
-          </ul>
-        </div>
+        {contratosEmAtraso.length > 0 && (
+          <div className='alert-card alert-warning'>
+            <h3>Contratos em atraso</h3>
+            <p>Existem {contratosEmAtraso.length} contrato(s) com pagamento em atraso.</p>
+            <ul>
+              {contratosEmAtraso.map((contrato) => (
+                <li key={contrato.id}>
+                  <strong>{contrato.locatario?.nome || 'Locatário'}</strong> — {contrato.sala?.identificacao || 'Sala'}{' '}
+                  ({contrato.sala?.terreno ? formatAddressLine(contrato.sala.terreno) : 'endereço não informado'})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       <section className='card'>
         <h2>Vencimentos dos aluguéis ({contratos.length})</h2>
         <div className='table-scroll'>
@@ -833,7 +873,11 @@ export default function Home() {
                     <td>Dia {contrato.diaVencimento ?? '—'}</td>
                     <td>{labelStatusContrato(contrato.status)}</td>
                     <td>
-                      <span className={situacao.className}>{situacao.label}</span>
+                      {situacao.className ? (
+                        <span className={situacao.className}>{situacao.label}</span>
+                      ) : (
+                        situacao.label
+                      )}
                     </td>
                     <td>
                       <button
