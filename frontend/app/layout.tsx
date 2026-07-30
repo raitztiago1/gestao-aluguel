@@ -4,7 +4,10 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Gestão de Aluguel',
-  description: 'Front-end simples para gestão de aluguel com API Spring Boot'
+  description: 'Front-end simples para gestão de aluguel com API Spring Boot',
+  icons: {
+    icon: '/favicon.ico'
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

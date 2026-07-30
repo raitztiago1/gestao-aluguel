@@ -16,6 +16,7 @@ import com.felicioecavalaro.gestao_aluguel.dto.ResetPasswordRequest;
 import com.felicioecavalaro.gestao_aluguel.exception.AuthenticationException;
 import com.felicioecavalaro.gestao_aluguel.exception.DuplicateResourceException;
 import com.felicioecavalaro.gestao_aluguel.exception.InvalidInputException;
+import com.felicioecavalaro.gestao_aluguel.exception.RegistrationDisabledException;
 import com.felicioecavalaro.gestao_aluguel.repository.UsuarioRepository;
 import com.felicioecavalaro.gestao_aluguel.security.InputSanitizer;
 import com.felicioecavalaro.gestao_aluguel.security.PasswordValidator;
@@ -39,6 +40,15 @@ public class AuthenticationService {
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
+
+    @Value("${app.auth.registration-enabled:true}")
+    private boolean registrationEnabled;
+
+    @Value("${app.rate-limit.forgot-password.max-attempts:5}")
+    private int forgotPasswordMaxAttempts;
+
+    @Value("${app.rate-limit.forgot-password.lock-duration-minutes:15}")
+    private int forgotPasswordLockDurationMinutes;
 
     public LoginResponse login(LoginRequest request) {
         if (request == null) {
@@ -91,6 +101,10 @@ public class AuthenticationService {
     }
 
     public LoginResponse register(RegisterRequest request) {
+        if (!registrationEnabled) {
+            throw new RegistrationDisabledException("Cadastro público desabilitado.");
+        }
+
         if (request == null) {
             throw new InvalidInputException("Email, senha e nome são obrigatórios");
         }
@@ -137,6 +151,16 @@ public class AuthenticationService {
         }
 
         String email = inputSanitizer.sanitizeEmail(request.getEmail());
+        String rateLimitKey = "forgot:" + email;
+
+        if (rateLimiter.isLocked(rateLimitKey, forgotPasswordMaxAttempts, forgotPasswordLockDurationMinutes)) {
+            String lockMessage = rateLimiter.getLockTimeRemaining(rateLimitKey, forgotPasswordLockDurationMinutes);
+            log.warn("Tentativa de redefinição de senha em conta bloqueada: {}", email);
+            throw new AuthenticationException(lockMessage);
+        }
+
+        rateLimiter.recordAttempt(rateLimitKey, forgotPasswordMaxAttempts);
+
         Usuario usuario = usuarioRepository.findByEmail(email).orElse(null);
 
         if (usuario == null) {

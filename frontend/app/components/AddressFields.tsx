@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import MaskedInput from './MaskedInput';
 import type { AddressFieldsState } from '../hooks/useCepLookup';
 
@@ -14,6 +15,7 @@ type AddressFieldsProps = {
   onCepChange: (value: string) => void | Promise<void>;
   required?: boolean;
   showComplement?: boolean;
+  idPrefix?: string;
 };
 
 export default function AddressFields({
@@ -21,15 +23,19 @@ export default function AddressFields({
   onChange,
   onCepChange,
   required = false,
-  showComplement = true
+  showComplement = true,
+  idPrefix
 }: AddressFieldsProps) {
-  const star = required ? <span className='required-star'>*</span> : null;
+  const generatedPrefix = useId().replace(/:/g, '');
+  const prefix = idPrefix ?? generatedPrefix;
+  const star = required ? <span className='required-star' aria-hidden='true'>*</span> : null;
 
   return (
     <>
       <div className='form-group'>
-        <label>CEP</label>
+        <label htmlFor={`${prefix}-cep`}>CEP</label>
         <MaskedInput
+          id={`${prefix}-cep`}
           mask='cep'
           value={value.cep}
           onValueChange={(v) => void onCepChange(v)}
@@ -41,11 +47,15 @@ export default function AddressFields({
       </div>
 
       <div className='form-group'>
-        <label>Logradouro {star}</label>
+        <label htmlFor={`${prefix}-endereco`}>
+          Logradouro {star}
+        </label>
         <input
+          id={`${prefix}-endereco`}
           className='input-field'
           type='text'
           required={required}
+          aria-required={required || undefined}
           value={value.endereco}
           onChange={(e) => onChange({ endereco: e.target.value })}
           placeholder='Rua, avenida...'
@@ -54,8 +64,9 @@ export default function AddressFields({
 
       <div className='form-grid-two'>
         <div className='form-group'>
-          <label>Número</label>
+          <label htmlFor={`${prefix}-numero`}>Número</label>
           <input
+            id={`${prefix}-numero`}
             className='input-field'
             type='text'
             value={value.numero}
@@ -65,8 +76,9 @@ export default function AddressFields({
         </div>
         {showComplement && (
           <div className='form-group'>
-            <label>Complemento</label>
+            <label htmlFor={`${prefix}-complemento`}>Complemento</label>
             <input
+              id={`${prefix}-complemento`}
               className='input-field'
               type='text'
               value={value.complemento}
@@ -78,8 +90,9 @@ export default function AddressFields({
       </div>
 
       <div className='form-group'>
-        <label>Bairro</label>
+        <label htmlFor={`${prefix}-bairro`}>Bairro</label>
         <input
+          id={`${prefix}-bairro`}
           className='input-field'
           type='text'
           value={value.bairro}
@@ -89,20 +102,28 @@ export default function AddressFields({
 
       <div className='form-grid-two'>
         <div className='form-group'>
-          <label>Cidade {star}</label>
+          <label htmlFor={`${prefix}-cidade`}>
+            Cidade {star}
+          </label>
           <input
+            id={`${prefix}-cidade`}
             className='input-field'
             type='text'
             required={required}
+            aria-required={required || undefined}
             value={value.cidade}
             onChange={(e) => onChange({ cidade: e.target.value })}
           />
         </div>
         <div className='form-group'>
-          <label>Estado {star}</label>
+          <label htmlFor={`${prefix}-estado`}>
+            Estado {star}
+          </label>
           <select
+            id={`${prefix}-estado`}
             className='select-field'
             required={required}
+            aria-required={required || undefined}
             value={value.estado}
             onChange={(e) => onChange({ estado: e.target.value })}
           >

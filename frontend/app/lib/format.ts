@@ -30,7 +30,13 @@ export function formatCurrency(value?: number | null): string {
 
 export function formatArea(value?: number | null): string {
   if (value == null || Number.isNaN(value)) return '—';
-  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²`;
+  return `${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+}
+
+/** Valor numérico de área formatado para campos de formulário (ex.: 850,50). */
+export function formatAreaInput(value?: number | null): string {
+  if (value == null || Number.isNaN(value)) return '';
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function formatCepDisplay(cep?: string | null): string {

@@ -3,6 +3,9 @@ package com.felicioecavalaro.gestao_aluguel.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -86,6 +89,7 @@ public class Fiador {
     @Column(name = "cep", length = 10)
     private String cep;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "documentos", columnDefinition = "jsonb")
     private String documentos;
 

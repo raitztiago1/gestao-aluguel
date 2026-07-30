@@ -19,6 +19,7 @@ import org.springframework.web.context.request.WebRequest;
 import com.felicioecavalaro.gestao_aluguel.exception.AuthenticationException;
 import com.felicioecavalaro.gestao_aluguel.exception.DuplicateResourceException;
 import com.felicioecavalaro.gestao_aluguel.exception.InvalidInputException;
+import com.felicioecavalaro.gestao_aluguel.exception.RegistrationDisabledException;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -60,6 +61,18 @@ public class GlobalExceptionHandler {
         body.put("timestamp", Instant.now().toString());
         body.put("status", HttpStatus.BAD_REQUEST.value());
         body.put("error", "Requisição inválida");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        return body;
+    }
+
+    @ExceptionHandler(RegistrationDisabledException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Map<String, Object> handleRegistrationDisabled(RegistrationDisabledException ex, WebRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("error", "Acesso negado");
         body.put("message", ex.getMessage());
         body.put("path", request.getDescription(false).replace("uri=", ""));
         return body;

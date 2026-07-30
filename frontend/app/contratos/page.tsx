@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import SortableTh from '../components/SortableTh';
 import StatusBadge from '../components/StatusBadge';
 import { useAuthGuard } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -17,7 +19,7 @@ import {
 import { dateBrToIso, isoToDateBr, maskCurrency, onlyDigits, parseCurrency } from '../lib/masks';
 import { getToken } from '../lib/session';
 
-type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVACAO' | 'CANCELADO';
+type StatusContrato = 'ATIVO' | 'ENCERRADO' | 'RENOVADO';
 type SortDirection = 'asc' | 'desc';
 type ContratoSortKey = 'sala' | 'locatario' | 'periodo' | 'valor' | 'vencimento' | 'status';
 
@@ -25,6 +27,7 @@ type Sala = {
   id: number;
   identificacao?: string;
   metragem?: number;
+  status?: 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
   terreno?: { endereco?: string; numero?: string; cidade?: string; estado?: string };
 };
 
@@ -89,6 +92,7 @@ export default function ContratosPage() {
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: ContratoSortKey; direction: SortDirection }>({
@@ -128,10 +132,11 @@ export default function ContratosPage() {
 
   const salvarContrato = async (event: FormEvent) => {
     event.preventDefault();
+    setErroModal(null);
     const dataInicio = dateBrToIso(formContrato.dataInicio);
     const dataTermino = dateBrToIso(formContrato.dataTermino);
     if (!dataInicio || !dataTermino) {
-      setErro('Informe datas válidas no formato DD/MM/AAAA.');
+      setErroModal('Informe datas válidas no formato DD/MM/AAAA.');
       return;
     }
     try {
@@ -170,14 +175,14 @@ export default function ContratosPage() {
             body: form
           });
         } catch (uploadErr) {
-          setErro('Contrato salvo, mas falha ao enviar o PDF.');
+          setErroModal('Contrato salvo, mas falha ao enviar o PDF.');
         }
       }
 
       resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(getErrorMessage(err, 'Falha ao salvar contrato.'));
+      setErroModal(getErrorMessage(err, 'Falha ao salvar contrato.'));
     }
   };
 
@@ -201,6 +206,7 @@ export default function ContratosPage() {
     setModoEdicao(true);
     setShowModal(true);
     setErro(null);
+    setErroModal(null);
   };
 
   const excluirContrato = async (id: number) => {
@@ -217,8 +223,14 @@ export default function ContratosPage() {
     setModoEdicao(false);
     setFormContrato(defaultContratoForm);
     setShowModal(false);
-    setErro(null);
+    setErroModal(null);
   };
+
+  useEscapeKey(resetForm, showModal);
+
+  const salasDisponiveis = salas.filter(
+    (sala) => sala.status === 'DISPONIVEL' || (modoEdicao && sala.id.toString() === formContrato.salaId)
+  );
 
   const handleSort = (key: ContratoSortKey) => {
     setSortConfig((current) => ({
@@ -310,17 +322,20 @@ export default function ContratosPage() {
             </div>
 
             <div className='modal-content'>
+              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
               <form onSubmit={salvarContrato} className='form-grid'>
                 <div className='form-group'>
-                  <label>Sala <span className='required-star'>*</span></label>
+                  <label htmlFor='contrato-sala'>Sala <span className='required-star' aria-hidden='true'>*</span></label>
                   <select
+                    id='contrato-sala'
                     className='select-field'
                     required
+                    aria-required='true'
                     value={formContrato.salaId}
                     onChange={(e) => setFormContrato((s) => ({ ...s, salaId: e.target.value }))}
                   >
                     <option value=''>Selecione a sala</option>
-                    {salas.map((sala) => (
+                    {salasDisponiveis.map((sala) => (
                       <option key={sala.id} value={sala.id}>
                         {formatSalaOption(sala)}
                       </option>
@@ -329,10 +344,12 @@ export default function ContratosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Locatário <span className='required-star'>*</span></label>
+                  <label htmlFor='contrato-locatario'>Locatário <span className='required-star' aria-hidden='true'>*</span></label>
                   <select
+                    id='contrato-locatario'
                     className='select-field'
                     required
+                    aria-required='true'
                     value={formContrato.locatarioId}
                     onChange={(e) => setFormContrato((s) => ({ ...s, locatarioId: e.target.value }))}
                   >
@@ -347,10 +364,12 @@ export default function ContratosPage() {
 
                 <div className='form-grid-two'>
                   <div className='form-group'>
-                    <label>Data de início <span className='required-star'>*</span></label>
+                    <label htmlFor='contrato-inicio'>Data de início <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='contrato-inicio'
                       mask='date'
                       required
+                      aria-required='true'
                       value={formContrato.dataInicio}
                       onValueChange={(dataInicio) => setFormContrato((s) => ({ ...s, dataInicio }))}
                       placeholder='DD/MM/AAAA'
@@ -358,10 +377,12 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div className='form-group'>
-                    <label>Data de término <span className='required-star'>*</span></label>
+                    <label htmlFor='contrato-termino'>Data de término <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='contrato-termino'
                       mask='date'
                       required
+                      aria-required='true'
                       value={formContrato.dataTermino}
                       onValueChange={(dataTermino) => setFormContrato((s) => ({ ...s, dataTermino }))}
                       placeholder='DD/MM/AAAA'
@@ -372,10 +393,12 @@ export default function ContratosPage() {
 
                 <div className='form-grid-two'>
                   <div className='form-group'>
-                    <label>Valor do aluguel <span className='required-star'>*</span></label>
+                    <label htmlFor='contrato-valor'>Valor do aluguel <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='contrato-valor'
                       mask='currency'
                       required
+                      aria-required='true'
                       value={formContrato.valorAluguel}
                       onValueChange={(valorAluguel) => setFormContrato((s) => ({ ...s, valorAluguel }))}
                       placeholder='0,00'
@@ -383,10 +406,12 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div className='form-group'>
-                    <label>Dia do vencimento <span className='required-star'>*</span></label>
+                    <label htmlFor='contrato-vencimento'>Dia do vencimento <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
+                      id='contrato-vencimento'
                       mask='day'
                       required
+                      aria-required='true'
                       value={formContrato.diaVencimento}
                       onValueChange={(diaVencimento) => setFormContrato((s) => ({ ...s, diaVencimento }))}
                       placeholder='Ex.: 10'
@@ -399,8 +424,9 @@ export default function ContratosPage() {
 
                 <div className='form-grid-three'>
                   <div className='form-group'>
-                    <label>Dia de cobrança da água</label>
+                    <label htmlFor='contrato-vencimento-agua'>Dia de cobrança da água</label>
                     <MaskedInput
+                      id='contrato-vencimento-agua'
                       mask='day'
                       value={formContrato.diaVencimentoAgua}
                       onValueChange={(diaVencimentoAgua) => setFormContrato((s) => ({ ...s, diaVencimentoAgua }))}
@@ -410,8 +436,9 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div className='form-group'>
-                    <label>Dia de cobrança da luz</label>
+                    <label htmlFor='contrato-vencimento-luz'>Dia de cobrança da luz</label>
                     <MaskedInput
+                      id='contrato-vencimento-luz'
                       mask='day'
                       value={formContrato.diaVencimentoLuz}
                       onValueChange={(diaVencimentoLuz) => setFormContrato((s) => ({ ...s, diaVencimentoLuz }))}
@@ -421,8 +448,9 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div className='form-group'>
-                    <label>Dia de cobrança do IPTU</label>
+                    <label htmlFor='contrato-vencimento-iptu'>Dia de cobrança do IPTU</label>
                     <MaskedInput
+                      id='contrato-vencimento-iptu'
                       mask='day'
                       value={formContrato.diaVencimentoIptu}
                       onValueChange={(diaVencimentoIptu) => setFormContrato((s) => ({ ...s, diaVencimentoIptu }))}
@@ -434,8 +462,9 @@ export default function ContratosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Outras despesas</label>
+                  <label htmlFor='contrato-outras-despesas'>Outras despesas</label>
                   <MaskedInput
+                    id='contrato-outras-despesas'
                     mask='currency'
                     value={formContrato.valorOutrasDespesas}
                     onValueChange={(valorOutrasDespesas) => setFormContrato((s) => ({ ...s, valorOutrasDespesas }))}
@@ -445,22 +474,23 @@ export default function ContratosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Status</label>
+                  <label htmlFor='contrato-status'>Status</label>
                   <select
+                    id='contrato-status'
                     className='select-field'
                     value={formContrato.status}
                     onChange={(e) => setFormContrato((s) => ({ ...s, status: e.target.value as StatusContrato }))}
                   >
                     <option value='ATIVO'>Ativo</option>
                     <option value='ENCERRADO'>Encerrado</option>
-                    <option value='RENOVACAO'>Em renovação</option>
-                    <option value='CANCELADO'>Cancelado</option>
+                    <option value='RENOVADO'>Renovado</option>
                   </select>
                 </div>
 
                 <div className='form-group'>
-                  <label>Observações</label>
+                  <label htmlFor='contrato-observacoes'>Observações</label>
                   <textarea
+                    id='contrato-observacoes'
                     className='textarea-field'
                     rows={4}
                     value={formContrato.observacoes}
@@ -469,8 +499,9 @@ export default function ContratosPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Documento do contrato (PDF)</label>
+                  <label htmlFor='contrato-documento'>Documento do contrato (PDF)</label>
                   <input
+                    id='contrato-documento'
                     type='file'
                     accept='application/pdf'
                     onChange={(e) => setDocumentFile(e.target.files && e.target.files.length ? e.target.files[0] : null)}
@@ -505,40 +536,17 @@ export default function ContratosPage() {
       )}
 
       <section className='card'>
+        <div className='table-scroll'>
         <table className='table'>
           <thead>
             <tr>
-              <th>
-                <button type='button' onClick={() => handleSort('sala')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Sala {sortConfig.key === 'sala' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('locatario')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Locatário {sortConfig.key === 'locatario' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('periodo')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Período {sortConfig.key === 'periodo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('valor')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Valor {sortConfig.key === 'valor' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('vencimento')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Vencimento {sortConfig.key === 'vencimento' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Sala' sortKey='sala' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
+              <SortableTh label='Locatário' sortKey='locatario' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
+              <SortableTh label='Período' sortKey='periodo' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
+              <SortableTh label='Valor' sortKey='valor' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
+              <SortableTh label='Vencimento' sortKey='vencimento' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
               <th>Contrato</th>
-              <th>
-                <button type='button' onClick={() => handleSort('status')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Status' sortKey='status' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as ContratoSortKey)} />
               <th>Ações</th>
             </tr>
           </thead>
@@ -592,6 +600,7 @@ export default function ContratosPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

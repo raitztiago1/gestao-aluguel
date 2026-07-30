@@ -15,6 +15,7 @@ import com.felicioecavalaro.gestao_aluguel.domain.enums.StatusSala;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Cobranca;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Contrato;
 import com.felicioecavalaro.gestao_aluguel.domain.model.Sala;
+import com.felicioecavalaro.gestao_aluguel.dto.ContratoRequestDTO;
 import com.felicioecavalaro.gestao_aluguel.repository.CobrancaRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.ContratoRepository;
 import com.felicioecavalaro.gestao_aluguel.repository.SalaRepository;
@@ -48,7 +49,8 @@ public class ContratoService {
     }
 
     @Transactional
-    public Contrato create(Contrato contrato) {
+    public Contrato create(ContratoRequestDTO dto) {
+        Contrato contrato = dto.toEntity();
         validateSalaAvailability(contrato);
         Contrato saved = repo.save(contrato);
         enrichContrato(saved);
@@ -57,13 +59,12 @@ public class ContratoService {
     }
 
     @Transactional
-    public Contrato update(Long id, Contrato contrato) {
-        if (!repo.existsById(id)) {
-            throw new EntityNotFoundException("Contrato não encontrado: " + id);
-        }
-        validateSalaAvailability(contrato, id);
-        contrato.setId(id);
-        Contrato saved = repo.save(contrato);
+    public Contrato update(Long id, ContratoRequestDTO dto) {
+        Contrato existing = repo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Contrato não encontrado: " + id));
+        dto.applyTo(existing);
+        validateSalaAvailability(existing, id);
+        Contrato saved = repo.save(existing);
         enrichContrato(saved);
         syncSalaStatus(saved);
         return saved;

@@ -4,11 +4,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import SortableTh from '../components/SortableTh';
 import StatusBadge from '../components/StatusBadge';
 import { useAuthGuard } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
-import { formatAddressLine, formatArea, formatTerrenoOption } from '../lib/format';
+import { formatAddressLine, formatArea, formatAreaInput, formatTerrenoOption } from '../lib/format';
 import { parseArea } from '../lib/masks';
 
 type TipoSalaStatus = 'DISPONIVEL' | 'LOCADA' | 'MANUTENCAO';
@@ -60,6 +62,7 @@ export default function SalasPage() {
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [sortConfig, setSortConfig] = useState<{ key: SalaSortKey; direction: SortDirection }>({
     key: 'identificacao',
@@ -127,7 +130,7 @@ export default function SalasPage() {
       resetForm();
       await carregarDados();
     } catch (err) {
-      setErro(getErrorMessage(err, 'Falha ao salvar sala.'));
+      setErroModal(getErrorMessage(err, 'Falha ao salvar sala.'));
     }
   };
 
@@ -135,14 +138,14 @@ export default function SalasPage() {
     setFormSala({
       id: sala.id,
       identificacao: sala.identificacao,
-      metragem: String(sala.metragem).replace('.', ','),
+      metragem: formatAreaInput(sala.metragem),
       status: sala.status ?? 'DISPONIVEL',
       terrenoId: sala.terreno?.id?.toString() ?? '',
       observacoes: sala.observacoes ?? ''
     });
     setModoEdicao(true);
     setShowModal(true);
-    setErro(null);
+    setErroModal(null);
   };
 
   const excluirSala = async (id: number) => {
@@ -159,8 +162,10 @@ export default function SalasPage() {
     setModoEdicao(false);
     setFormSala(defaultSalaForm);
     setShowModal(false);
-    setErro(null);
+    setErroModal(null);
   };
+
+  useEscapeKey(resetForm, showModal);
 
   const handleSort = (key: SalaSortKey) => {
     setSortConfig((current) => ({
@@ -244,12 +249,15 @@ export default function SalasPage() {
             </div>
 
             <div className='modal-content'>
+              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
               <form onSubmit={salvarSala} className='form-grid'>
                 <div className='form-group'>
-                  <label>Terreno <span className='required-star'>*</span></label>
+                  <label htmlFor='sala-terreno'>Terreno <span className='required-star' aria-hidden='true'>*</span></label>
                   <select
+                    id='sala-terreno'
                     className='select-field'
                     required
+                    aria-required='true'
                     value={formSala.terrenoId}
                     onChange={(e) => setFormSala((s) => ({ ...s, terrenoId: e.target.value }))}
                   >
@@ -263,11 +271,13 @@ export default function SalasPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Identificação <span className='required-star'>*</span></label>
+                  <label htmlFor='sala-identificacao'>Identificação <span className='required-star' aria-hidden='true'>*</span></label>
                   <input
+                    id='sala-identificacao'
                     className='input-field'
                     type='text'
                     required
+                    aria-required='true'
                     placeholder='Ex.: Sala 101, Bloco A'
                     value={formSala.identificacao}
                     onChange={(e) => setFormSala((s) => ({ ...s, identificacao: e.target.value }))}
@@ -275,10 +285,12 @@ export default function SalasPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Metragem (m²) <span className='required-star'>*</span></label>
+                  <label htmlFor='sala-metragem'>Metragem (m²) <span className='required-star' aria-hidden='true'>*</span></label>
                   <MaskedInput
+                    id='sala-metragem'
                     mask='area'
                     required
+                    aria-required='true'
                     value={formSala.metragem}
                     onValueChange={(metragem) => setFormSala((s) => ({ ...s, metragem }))}
                     placeholder='Ex.: 45,00'
@@ -287,8 +299,9 @@ export default function SalasPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Status</label>
+                  <label htmlFor='sala-status'>Status</label>
                   <select
+                    id='sala-status'
                     className='select-field'
                     value={formSala.status}
                     onChange={(e) => setFormSala((s) => ({ ...s, status: e.target.value as TipoSalaStatus }))}
@@ -300,8 +313,9 @@ export default function SalasPage() {
                 </div>
 
                 <div className='form-group'>
-                  <label>Observações</label>
+                  <label htmlFor='sala-observacoes'>Observações</label>
                   <textarea
+                    id='sala-observacoes'
                     className='textarea-field'
                     rows={4}
                     value={formSala.observacoes}
@@ -324,29 +338,14 @@ export default function SalasPage() {
       )}
 
       <section className='card'>
+        <div className='table-scroll'>
         <table className='table'>
           <thead>
             <tr>
-              <th>
-                <button type='button' onClick={() => handleSort('identificacao')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Sala {sortConfig.key === 'identificacao' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('terreno')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Terreno {sortConfig.key === 'terreno' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('metragem')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Metragem {sortConfig.key === 'metragem' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
-              <th>
-                <button type='button' onClick={() => handleSort('status')} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', fontWeight: 'inherit' }}>
-                  Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                </button>
-              </th>
+              <SortableTh label='Sala' sortKey='identificacao' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as SalaSortKey)} />
+              <SortableTh label='Terreno' sortKey='terreno' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as SalaSortKey)} />
+              <SortableTh label='Metragem' sortKey='metragem' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as SalaSortKey)} />
+              <SortableTh label='Status' sortKey='status' activeKey={sortConfig.key} direction={sortConfig.direction} onSort={(key) => handleSort(key as SalaSortKey)} />
               <th>Ações</th>
             </tr>
           </thead>
@@ -379,6 +378,7 @@ export default function SalasPage() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

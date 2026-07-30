@@ -5,6 +5,9 @@ import java.time.LocalDate;
 
 import com.felicioecavalaro.gestao_aluguel.domain.enums.TipoPessoa;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -101,6 +104,7 @@ public class Locatario {
     @Column(name = "cargo_contato")
     private String cargoContato;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "documentos", columnDefinition = "jsonb")
     private String documentos;
 

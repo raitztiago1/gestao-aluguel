@@ -5,12 +5,14 @@ import AppHeader from '../components/AppHeader';
 import ErrorAlert from '../components/ErrorAlert';
 import StatusBadge from '../components/StatusBadge';
 import { useAuthGuard } from '../hooks/useAuth';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { deleteJson, fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
   formatAddressLine,
   formatArea,
   formatCurrency,
+  formatDate,
   labelStatusContrato,
   labelTipoTerreno
 } from '../lib/format';
@@ -175,8 +177,26 @@ function obterAnoInicioContrato(contrato?: Contrato | null) {
   return new Date(`${contrato.dataInicio}T00:00:00`).getFullYear();
 }
 
-function mesPermitidoParaAno(contrato: Contrato | null, ano: number | undefined, mes: number) {
-  return periodoPermitido(contrato, ano, mes);
+function contratoAindaNaoIniciou(contrato?: Contrato | null) {
+  const dataInicio = obterDataInicioContrato(contrato);
+  if (!dataInicio) {
+    return false;
+  }
+  return dataInicio > formatarDataInput();
+}
+
+function mensagemAdicionarPagamento(contrato: Contrato | null, cobrancas: Cobranca[]) {
+  if (contratoAindaNaoIniciou(contrato)) {
+    const inicio = formatDate(contrato?.dataInicio);
+    return `O contrato ainda não iniciou. Pagamentos só podem ser registrados a partir de ${inicio}.`;
+  }
+
+  const pagamentoInicial = criarPagamentoInicial(cobrancas, contrato);
+  if (!periodoPermitido(contrato, pagamentoInicial.ano, pagamentoInicial.mes)) {
+    return 'Todos os pagamentos do contrato até o mês atual já foram registrados.';
+  }
+
+  return null;
 }
 
 export default function Home() {
@@ -254,15 +274,15 @@ export default function Home() {
   };
 
   const abrirFormularioAdicionar = () => {
-    const pagamentoInicial = criarPagamentoInicial(cobrancas, contratoSelecionado);
-    if (!periodoPermitido(contratoSelecionado, pagamentoInicial.ano, pagamentoInicial.mes)) {
-      setErro('Todos os pagamentos do contrato ate o mes atual ja foram registrados.');
+    const mensagem = mensagemAdicionarPagamento(contratoSelecionado, cobrancas);
+    if (mensagem) {
+      setErro(mensagem);
       return;
     }
 
     setModoPagamentoForm('adicionar');
     setCobrancaEmEdicao(null);
-    setFormPagamento(pagamentoInicial);
+    setFormPagamento(criarPagamentoInicial(cobrancas, contratoSelecionado));
     setErro(null);
   };
 
@@ -295,11 +315,11 @@ export default function Home() {
       return;
     }
     if (!periodoPermitido(contratoSelecionado, formPagamento.ano, formPagamento.mes)) {
-      setErro('Selecione um periodo dentro da vigencia do contrato e ate o mes atual.');
+      setErro('Selecione um período dentro da vigência do contrato e até o mês atual.');
       return;
     }
     if (!dataPagamentoPermitida(contratoSelecionado, formPagamento.dataPagamento)) {
-      setErro('A data de pagamento deve estar entre a data de inicio do contrato e hoje.');
+      setErro('A data de pagamento deve estar entre a data de início do contrato e hoje.');
       return;
     }
 
@@ -307,7 +327,7 @@ export default function Home() {
       (cobranca) => cobranca.ano === formPagamento.ano && cobranca.mes === formPagamento.mes
     );
     if (modoPagamentoForm === 'adicionar' && periodoJaRegistrado) {
-      setErro('Ja existe um pagamento registrado para este periodo. Use Editar ou escolha outro mes.');
+      setErro('Já existe um pagamento registrado para este período. Use Editar ou escolha outro mês.');
       return;
     }
 
@@ -426,6 +446,12 @@ export default function Home() {
   const verificarAtraso = (contrato: Contrato) =>
     contrato.status === 'ATIVO' && contrato.situacao === 'EM_ATRASO';
 
+  const fecharModalResumo = () => setSelectedModal(null);
+  const fecharModalPagamentos = () => setSelectedModal(null);
+
+  useEscapeKey(fecharModalResumo, selectedModal !== null && selectedModal !== 'pagamentos');
+  useEscapeKey(fecharModalPagamentos, selectedModal === 'pagamentos');
+
   const contratosEmAtraso = contratos.filter(verificarAtraso);
   const contratosAtivos = contratos.filter((c) => c.status === 'ATIVO');
   const salasDisponiveis = salas.filter((s) => s.status === 'DISPONIVEL');
@@ -453,7 +479,7 @@ export default function Home() {
           <span className='summary-action-text'>Ver detalhes</span>
         </button>
         <button type='button' className='summary-card summary-card-highlight summary-action-card' onClick={() => setSelectedModal('salas')}>
-          <p className='summary-label'>Salas para alugar</p>
+          <p className='summary-label'>Salas disponíveis</p>
           <strong className='summary-value'>{salasDisponiveisCount}</strong>
           <span className='summary-action-text'>Ver detalhes</span>
         </button>
@@ -467,7 +493,7 @@ export default function Home() {
                 <h2>
                   {selectedModal === 'terrenos' && 'Terrenos cadastrados'}
                   {selectedModal === 'contratos' && 'Contratos ativos'}
-                  {selectedModal === 'salas' && 'Salas para alugar'}
+                  {selectedModal === 'salas' && 'Salas disponíveis'}
                 </h2>
                 <p className='modal-description'>Resumo atualizado do seu portfólio.</p>
               </div>
@@ -635,7 +661,7 @@ export default function Home() {
                           <option
                             key={i + 1}
                             value={i + 1}
-                            disabled={!mesPermitidoParaAno(contratoSelecionado, formPagamento.ano, i + 1)}
+                            disabled={!periodoPermitido(contratoSelecionado, formPagamento.ano, i + 1)}
                           >
                             {new Date(2024, i).toLocaleString('pt-BR', { month: 'long' })}
                           </option>
@@ -774,6 +800,7 @@ export default function Home() {
         </div>
       <section className='card'>
         <h2>Vencimentos dos aluguéis ({contratos.length})</h2>
+        <div className='table-scroll'>
         <table className='table'>
           <thead>
             <tr>
@@ -823,6 +850,7 @@ export default function Home() {
             )}
           </tbody>
         </table>
+        </div>
       </section>
     </main>
   );

@@ -70,6 +70,20 @@ class LocatarioServiceTest {
     }
 
     @Test
+    void createSavesLocatarioWithDocumentosJson() {
+        Locatario locatario = Locatario.builder()
+                .nome("Locatário com docs")
+                .documentos("{\"rg\":\"123456\"}")
+                .build();
+        when(repo.save(locatario)).thenReturn(locatario);
+
+        Locatario created = service.create(locatario);
+
+        assertEquals("{\"rg\":\"123456\"}", created.getDocumentos());
+        verify(repo).save(locatario);
+    }
+
+    @Test
     void updateThrowsWhenNotFound() {
         Locatario locatario = sampleLocatario();
         when(repo.existsById(1L)).thenReturn(false);

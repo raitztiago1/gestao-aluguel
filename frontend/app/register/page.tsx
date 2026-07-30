@@ -97,22 +97,25 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className='form-grid'>
           <div className='form-group'>
-            <label>Nome Completo</label>
+            <label htmlFor='register-nome'>Nome Completo</label>
             <input
+              id='register-nome'
               className='input-field'
               type='text'
               value={nomeCompleto}
               onChange={(e) => setNomeCompleto(e.target.value)}
               required
+              aria-required='true'
               disabled={loading}
               placeholder='Ex: João Silva'
             />
           </div>
 
           <div className='form-group'>
-            <label>Email</label>
+            <label htmlFor='register-email'>Email</label>
             {emailError && <span className='field-error'>{emailError}</span>}
             <input
+              id='register-email'
               className={`input-field${emailError ? ' invalid' : ''}`}
               type='email'
               value={email}
@@ -121,19 +124,22 @@ export default function Register() {
                 if (emailError) setEmailError('');
               }}
               required
+              aria-required='true'
               disabled={loading}
               placeholder='seu@email.com'
             />
           </div>
 
           <div className='form-group'>
-            <label>Senha</label>
+            <label htmlFor='register-senha'>Senha</label>
             <input
+              id='register-senha'
               className='input-field'
               type='password'
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               required
+              aria-required='true'
               disabled={loading}
               placeholder='Mínimo 8 caracteres, com maiúsculas e números'
             />
@@ -143,13 +149,15 @@ export default function Register() {
           </div>
 
           <div className='form-group'>
-            <label>Confirmar Senha</label>
+            <label htmlFor='register-confirmar-senha'>Confirmar Senha</label>
             <input
+              id='register-confirmar-senha'
               className='input-field'
               type='password'
               value={confirmarSenha}
               onChange={(e) => setConfirmarSenha(e.target.value)}
               required
+              aria-required='true'
               disabled={loading}
               placeholder='Repita a senha'
             />

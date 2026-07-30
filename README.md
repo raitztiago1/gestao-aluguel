@@ -66,6 +66,26 @@ A inteligência de dados está centralizada no esquema SQL (`V1__init.sql`), gar
 - **BCrypt**: Senhas são criptografadas antes de serem persistidas.
 - **Proteção de Rotas**: O frontend verifica a validade da sessão (`isSessionValid`) em cada carregamento de página protegida.
 - **Global Exception Handler**: Centraliza erros de integridade (ex: tentativa de excluir registro com vínculo) e retorna mensagens amigáveis ao usuário final.
+- **Profiles Spring**: em desenvolvimento local o profile padrão é `dev` (habilita endpoints `/api/test/**`). Em produção use `prod` — endpoints de teste ficam indisponíveis e o cadastro público é desabilitado por padrão.
+
+### Variáveis de ambiente
+
+Configure estas variáveis no deploy ou em um arquivo `.env` local **não versionado**. Valores abaixo são apenas referência — nunca commite segredos reais.
+
+| Variável | Obrigatória em prod | Descrição |
+|----------|---------------------|-----------|
+| `APP_JWT_SECRET` | Sim | Chave HS512 com **≥ 64 caracteres**. Usada para assinar tokens JWT. |
+| `SPRING_DATASOURCE_URL` | Sim | URL JDBC do PostgreSQL (ex.: `jdbc:postgresql://host:5432/gestao_aluguel`). |
+| `SPRING_DATASOURCE_USERNAME` | Recomendado | Usuário do banco. |
+| `SPRING_DATASOURCE_PASSWORD` | Sim | Senha do banco. |
+| `SPRING_PROFILES_ACTIVE` | Sim | `prod` em deploy; `dev` para desenvolvimento local (habilita seed via `/api/test`). |
+| `SPRING_MAIL_HOST` | Opcional | Host SMTP para e-mails de reset de senha e lembretes. |
+| `SPRING_MAIL_USERNAME` | Opcional | Usuário SMTP. |
+| `SPRING_MAIL_PASSWORD` | Opcional | Senha SMTP. |
+
+**Desenvolvimento local:** o `application.properties` define `spring.profiles.active=dev` e fornece defaults seguros apenas para máquina local (JWT e PostgreSQL em localhost). Não use esses defaults em produção.
+
+**Produção:** ative o profile `prod` (`application-prod.properties`) e defina todas as variáveis obrigatórias. O boot falha se `APP_JWT_SECRET` estiver ausente ou inválido. O cadastro público (`POST /api/auth/register`) fica desabilitado (`app.auth.registration-enabled=false`).
 
 ---
 
