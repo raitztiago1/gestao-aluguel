@@ -78,3 +78,22 @@ Registro de execução de planos. Atualizar ao concluir cada task.
 
 **Verificação:** `.\mvnw.cmd test` + `npm run build` verdes. Review: `reviews/usabilidade-pos-revisao-2026-07-30.md`.
 
+---
+
+## limpeza-otimizacao-arquivos — 2026-07-30
+
+| Task | Status | Notas |
+|------|--------|-------|
+| T01  | done   | Órfãos raiz removidos (Java, PNGs, lock, SQLs); stubs preservados |
+| T02  | done   | `*.tsbuildinfo` no `.gitignore` |
+| T03  | done   | `scripts/dev/` com seed, test-query, check-db |
+| T04  | done   | Docs em `docs/`; TEST_SUMMARY deletado; links corrigidos |
+| T05  | done   | README: testes, scripts, docs, auth, roadmap |
+| T06  | done   | Audit documentado no review (docker/psql indisponíveis) |
+| T07  | done   | `V2__create_usuario_table.sql` removido |
+| T08  | done   | `V6__add_contrato_documento.sql`; conflito V2 resolvido |
+| T09  | done   | `scripts/dev/check-flyway-history.sql` |
+| T10  | partial | mvnw/lint/build verdes; Docker fresh install pendente |
+
+**Verificação:** `.\mvnw.cmd test` (186), `npm run lint`, `npm run build` verdes. Review: `reviews/limpeza-otimizacao-arquivos-2026-07-30.md`. **Pendente:** RF-10 Docker fresh install (CLI docker ausente).
+

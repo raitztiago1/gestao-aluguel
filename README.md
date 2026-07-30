@@ -87,6 +87,70 @@ Configure estas variáveis no deploy ou em um arquivo `.env` local **não versio
 
 **Produção:** ative o profile `prod` (`application-prod.properties`) e defina todas as variáveis obrigatórias. O boot falha se `APP_JWT_SECRET` estiver ausente ou inválido. O cadastro público (`POST /api/auth/register`) fica desabilitado (`app.auth.registration-enabled=false`).
 
+### Fluxo de autenticação
+
+- **Login:** `POST /api/auth/login` — retorna JWT (validade 24 h); frontend persiste token em `localStorage`.
+- **Registro:** `POST /api/auth/register` — disponível apenas com profile `dev` ou quando `app.auth.registration-enabled=true`.
+- **Recuperação de senha:** `POST /api/auth/forgot-password` e `POST /api/auth/reset-password`.
+- **Rotas protegidas:** header `Authorization: Bearer <token>`; filtro JWT valida em cada requisição.
+
+Detalhes históricos e guia expandido: [docs/historico/auth-setup.md](docs/historico/auth-setup.md).
+
+---
+
+## 🧪 Testes
+
+Verificação da suite completa (backend):
+
+```powershell
+.\mvnw.cmd test
+```
+
+Frontend (lint e build):
+
+```powershell
+cd frontend
+npm run lint
+npm run build
+```
+
+A contagem de testes é dinâmica — use o comando acima ou o pipeline de CI como fonte de verdade. Referência de testes de segurança: [docs/testes/seguranca.md](docs/testes/seguranca.md).
+
+---
+
+## 📜 Scripts de desenvolvimento
+
+Scripts SQL úteis em `scripts/dev/` (executar com `psql` local ou via Docker):
+
+| Script | Uso |
+|--------|-----|
+| [seed-test-data.sql](scripts/dev/seed-test-data.sql) | Insere locatário e contrato de exemplo para QA manual |
+| [test-query.sql](scripts/dev/test-query.sql) | Lista últimos documentos de contrato |
+| [check-db.sql](scripts/dev/check-db.sql) | Verifica existência e dados da tabela `contrato_documento` |
+| [check-flyway-history.sql](scripts/dev/check-flyway-history.sql) | Audita histórico Flyway (versões 1, 3, 4, 5, 6) |
+
+Exemplo com Docker:
+
+```powershell
+docker exec -i gestao-aluguel-db psql -U postgres -d gestao_aluguel -f - < scripts/dev/check-flyway-history.sql
+```
+
+---
+
+## 📚 Documentação
+
+| Path | Conteúdo |
+|------|----------|
+| [docs/historico/](docs/historico/) | Revisão de usabilidade, plano de testes inicial, guia de auth legado |
+| [docs/testes/seguranca.md](docs/testes/seguranca.md) | Referência de testes de segurança (pós-hardening) |
+| [docs/manual/](docs/manual/) | Manual imprimível para usuários finais |
+
+Specs e reviews ativas: `specs/`, `reviews/`, `ideas/`.
+
+### Roadmap — domínio incompleto
+
+Entidades e repositórios stub mantidos intencionalmente para features futuras (`Fiador`, `Caucao`, `ConfiguracaoLocador`). Ver [ideas/mapeamento-features-sistema.md](ideas/mapeamento-features-sistema.md).
+
 ---
 
 ## 📁 Estrutura de Arquivos

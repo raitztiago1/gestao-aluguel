@@ -7,7 +7,7 @@
 | **Feature slug** | `usabilidade-pos-revisao` |
 | **Status** | **Aprovada** (2026-07-30) |
 | **Data** | 2026-07-30 |
-| **Origem** | [ideas/usabilidade-pos-revisao.md](../../ideas/usabilidade-pos-revisao.md) ← [REVISAO_USABILIDADE.md](../../REVISAO_USABILIDADE.md) |
+| **Origem** | [ideas/usabilidade-pos-revisao.md](../../ideas/usabilidade-pos-revisao.md) ← [revisao-usabilidade-2026-07.md](../../docs/historico/revisao-usabilidade-2026-07.md) |
 | **Stack** | Java 25, Spring Boot 4, JPA/Hibernate 6, Next.js 14 (App Router), React 18, TypeScript 5 |
 | **Impacto** | Backend (Locatário, Fiador, Contrato) + frontend (CRUDs, dashboard, auth, layout) |
 
@@ -313,9 +313,9 @@ cd frontend; npm run build
 
 ## Referências
 
-- [REVISAO_USABILIDADE.md](../../REVISAO_USABILIDADE.md) — relatório original Playwright
+- [revisao-usabilidade-2026-07.md](../../docs/historico/revisao-usabilidade-2026-07.md) — relatório original Playwright
 - [ideas/usabilidade-pos-revisao.md](../../ideas/usabilidade-pos-revisao.md) — ideia aprovada
-- Screenshots de evidência: `01-dashboard-vazio.png` … `06-mobile-modal.png` (raiz do projeto)
+- Evidências visuais: conteúdo preservado no relatório e em `reviews/usabilidade-pos-revisao-2026-07-30.md` (screenshots da raiz removidos na limpeza 2026-07-30)
 
 ---
 

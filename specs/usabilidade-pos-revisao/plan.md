@@ -32,7 +32,7 @@ T01–T02 desbloqueiam o fluxo núcleo. T03–T04 corrigem UX de erro. T05–T08
 ### Ações
 
 1. Confirmar `@JdbcTypeCode(SqlTypes.JSON)` + `@Column(columnDefinition = "jsonb")` em `Locatario` e `Fiador`.
-2. Se ausente, aplicar anotação conforme revisão (`REVISAO_USABILIDADE.md` BUG-1).
+2. Se ausente, aplicar anotação conforme revisão ([revisao-usabilidade-2026-07.md](../../docs/historico/revisao-usabilidade-2026-07.md) BUG-1).
 3. Adicionar teste que exercite persistência com campo `documentos` não-nulo (MockMvc `@SpringBootTest` ou `@DataJpaTest` com H2/Postgres testcontainer — preferir MockMvc se já houver padrão no projeto).
 4. Smoke: `POST /api/locatarios` com JWT válido retorna **201**, não **500**.
 

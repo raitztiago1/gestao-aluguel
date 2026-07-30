@@ -2,7 +2,7 @@
 
 **Status:** Aprovada para spec — `specs/usabilidade-pos-revisao/about.md`  
 **Data:** 2026-07-30  
-**Origem:** `REVISAO_USABILIDADE.md` (teste E2E Playwright, 06/07/2026)
+**Origem:** [revisao-usabilidade-2026-07.md](../docs/historico/revisao-usabilidade-2026-07.md) (teste E2E Playwright, 06/07/2026)
 
 ---
 

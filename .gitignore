@@ -42,3 +42,6 @@ frontend/.next/
 
 ### Playwright MCP (debug artifacts) ###
 .playwright-mcp/
+
+### TypeScript build cache ###
+*.tsbuildinfo
