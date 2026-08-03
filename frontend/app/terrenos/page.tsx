@@ -3,12 +3,13 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
+import ConfirmDialog from '../components/ConfirmDialog';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import Modal from '../components/Modal';
 import SortableTh from '../components/SortableTh';
 import { useCepLookup } from '../hooks/useCepLookup';
 import { useAuthGuard } from '../hooks/useAuth';
-import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { formatAddressLine, formatArea, formatAreaInput, labelTipoTerreno } from '../lib/format';
@@ -119,6 +120,7 @@ export default function TerrenosPage() {
   const [formTerreno, setFormTerreno] = useState<TerrenoForm>(defaultTerrenoForm);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [terrenoParaExcluir, setTerrenoParaExcluir] = useState<Terreno | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: TerrenoSortKey; direction: SortDirection }>({
     key: 'endereco',
     direction: 'asc'
@@ -180,13 +182,15 @@ export default function TerrenosPage() {
     resetCepRef();
   };
 
-  const excluirTerreno = async (id: number) => {
-    if (!window.confirm('Deseja realmente excluir este terreno?')) return;
+  const excluirTerreno = async () => {
+    if (!terrenoParaExcluir) return;
+
     try {
-      await requestJson<void>(`/api/terrenos/${id}`, 'DELETE');
+      await requestJson<void>(`/api/terrenos/${terrenoParaExcluir.id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
       setErro(getErrorMessage(err, 'Falha ao excluir terreno.'));
+      throw err;
     }
   };
 
@@ -197,8 +201,6 @@ export default function TerrenosPage() {
     setErroModal(null);
     resetCepRef();
   };
-
-  useEscapeKey(resetForm, showModal);
 
   const handleTipoChange = (novoTipo: TipoTerreno) => {
     setFormTerreno((s) => {
@@ -290,127 +292,153 @@ export default function TerrenosPage() {
         </button>
       </div>
 
-      {showModal && (
-        <div className='modal-backdrop' onClick={resetForm}>
-          <div className='modal' onClick={(e) => e.stopPropagation()}>
-            <div className='modal-header'>
-              <div>
-                <h2>{modoEdicao ? 'Editar terreno' : 'Novo terreno'}</h2>
-                <p className='modal-description'>Informe tipo, endereço e metragem do imóvel.</p>
-              </div>
-              <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
-            </div>
-
-            <div className='modal-content'>
-              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
-              <form onSubmit={salvarTerreno} className='form-grid'>
-                <div className='form-group'>
-                  <label htmlFor='terreno-tipo'>Tipo <span className='required-star' aria-hidden='true'>*</span></label>
-                  <select
-                    id='terreno-tipo'
-                    className='select-field'
-                    value={formTerreno.tipo}
-                    onChange={(e) => handleTipoChange(e.target.value as TipoTerreno)}
-                    required
-                    aria-required='true'
-                  >
-                    <option value='COMERCIAL'>Comercial</option>
-                    <option value='RESIDENCIAL'>Residencial</option>
-                  </select>
-                </div>
-
-                <AddressFields
+      <Modal
+        isOpen={showModal}
+        title={modoEdicao ? 'Editar terreno' : 'Novo terreno'}
+        description='Informe tipo, endereço e metragem do imóvel.'
+        onClose={resetForm}
+        closeOnBackdrop={false}
+        actions={(
+          <>
+            <button
+              type='submit'
+              form='terreno-form'
+              className='button button-primary'
+            >
+              {modoEdicao ? 'Salvar alterações' : 'Cadastrar terreno'}
+            </button>
+            <button type='button' className='button button-secondary' onClick={resetForm}>
+              Cancelar
+            </button>
+          </>
+        )}
+      >
+        {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
+        <form id='terreno-form' onSubmit={salvarTerreno} className='form-grid'>
+          <section className='form-section' aria-labelledby='terreno-identificacao-heading'>
+            <h3 id='terreno-identificacao-heading'>Identificação</h3>
+            <div className='form-grid'>
+              <div className='form-group'>
+                <label htmlFor='terreno-tipo'>Tipo <span className='required-star' aria-hidden='true'>*</span></label>
+                <select
+                  id='terreno-tipo'
+                  className='select-field'
+                  value={formTerreno.tipo}
+                  onChange={(e) => handleTipoChange(e.target.value as TipoTerreno)}
                   required
-                  value={formTerreno}
-                  onChange={(patch) => setFormTerreno((s) => ({ ...s, ...patch }))}
-                  onCepChange={(v) => handleCepChange(v, (cep) => setFormTerreno((s) => ({ ...s, cep })))}
-                />
+                  aria-required='true'
+                >
+                  <option value='COMERCIAL'>Comercial</option>
+                  <option value='RESIDENCIAL'>Residencial</option>
+                </select>
+              </div>
+            </div>
+          </section>
 
+          <section className='form-section' aria-labelledby='terreno-endereco-heading'>
+            <h3 id='terreno-endereco-heading'>Endereço</h3>
+            <div className='form-grid'>
+              <AddressFields
+                required
+                value={formTerreno}
+                onChange={(patch) => setFormTerreno((s) => ({ ...s, ...patch }))}
+                onCepChange={(v) => handleCepChange(v, (cep) => setFormTerreno((s) => ({ ...s, cep })))}
+              />
+            </div>
+          </section>
+
+          <section className='form-section' aria-labelledby='terreno-caracteristicas-heading'>
+            <h3 id='terreno-caracteristicas-heading'>Características do terreno</h3>
+            <div className='form-grid'>
+              <div className='form-group'>
+                <label htmlFor='terreno-metragem-total'>Metragem total <span className='required-star' aria-hidden='true'>*</span></label>
+                <MaskedInput
+                  id='terreno-metragem-total'
+                  mask='area'
+                  required
+                  aria-required='true'
+                  value={formTerreno.metragemTotal}
+                  onValueChange={(metragemTotal) => setFormTerreno((s) => ({ ...s, metragemTotal }))}
+                  placeholder='Ex.: 500,00'
+                  inputMode='decimal'
+                />
+                <span className='field-hint'>Área total do terreno em m²</span>
+              </div>
+
+              {formTerreno.tipo === 'COMERCIAL' && (
+                <div className='form-grid-two'>
+                  <div className='form-group'>
+                    <label htmlFor='terreno-vagas'>Vagas de garagem <span className='required-star' aria-hidden='true'>*</span></label>
+                    <input
+                      id='terreno-vagas'
+                      className='input-field'
+                      type='number'
+                      min='0'
+                      required
+                      aria-required='true'
+                      value={formTerreno.vagasGaragem}
+                      onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))}
+                    />
+                  </div>
+                  <div className='form-group'>
+                    <label htmlFor='terreno-qtd-salas'>Quantidade de salas <span className='required-star' aria-hidden='true'>*</span></label>
+                    <input
+                      id='terreno-qtd-salas'
+                      className='input-field'
+                      type='number'
+                      min='0'
+                      required
+                      aria-required='true'
+                      value={formTerreno.quantidadeSalas}
+                      onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formTerreno.tipo === 'RESIDENCIAL' && (
                 <div className='form-group'>
-                  <label htmlFor='terreno-metragem-total'>Metragem total <span className='required-star' aria-hidden='true'>*</span></label>
+                  <label htmlFor='terreno-metragem-casa'>Metragem da casa <span className='required-star' aria-hidden='true'>*</span></label>
                   <MaskedInput
-                    id='terreno-metragem-total'
+                    id='terreno-metragem-casa'
                     mask='area'
                     required
                     aria-required='true'
-                    value={formTerreno.metragemTotal}
-                    onValueChange={(metragemTotal) => setFormTerreno((s) => ({ ...s, metragemTotal }))}
-                    placeholder='Ex.: 500,00'
+                    value={formTerreno.metragemCasa}
+                    onValueChange={(metragemCasa) => setFormTerreno((s) => ({ ...s, metragemCasa }))}
                     inputMode='decimal'
                   />
-                  <span className='field-hint'>Área total do terreno em m²</span>
                 </div>
-
-                {formTerreno.tipo === 'COMERCIAL' && (
-                  <div className='form-grid-three'>
-                    <div className='form-group'>
-                      <label htmlFor='terreno-vagas'>Vagas de garagem <span className='required-star' aria-hidden='true'>*</span></label>
-                      <input
-                        id='terreno-vagas'
-                        className='input-field'
-                        type='number'
-                        min='0'
-                        required
-                        aria-required='true'
-                        value={formTerreno.vagasGaragem}
-                        onChange={(e) => setFormTerreno((s) => ({ ...s, vagasGaragem: e.target.value }))}
-                      />
-                    </div>
-                    <div className='form-group'>
-                      <label htmlFor='terreno-qtd-salas'>Quantidade de salas <span className='required-star' aria-hidden='true'>*</span></label>
-                      <input
-                        id='terreno-qtd-salas'
-                        className='input-field'
-                        type='number'
-                        min='0'
-                        required
-                        aria-required='true'
-                        value={formTerreno.quantidadeSalas}
-                        onChange={(e) => setFormTerreno((s) => ({ ...s, quantidadeSalas: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {formTerreno.tipo === 'RESIDENCIAL' && (
-                  <div className='form-group'>
-                    <label htmlFor='terreno-metragem-casa'>Metragem da casa <span className='required-star' aria-hidden='true'>*</span></label>
-                    <MaskedInput
-                      id='terreno-metragem-casa'
-                      mask='area'
-                      required
-                      aria-required='true'
-                      value={formTerreno.metragemCasa}
-                      onValueChange={(metragemCasa) => setFormTerreno((s) => ({ ...s, metragemCasa }))}
-                      inputMode='decimal'
-                    />
-                  </div>
-                )}
-
-                <div className='form-group'>
-                  <label htmlFor='terreno-observacoes'>Observações</label>
-                  <textarea
-                    id='terreno-observacoes'
-                    className='textarea-field'
-                    rows={4}
-                    value={formTerreno.observacoes}
-                    onChange={(e) => setFormTerreno((s) => ({ ...s, observacoes: e.target.value }))}
-                  />
-                </div>
-
-                <div className='form-actions'>
-                  <button type='submit' className='button button-primary'>
-                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar terreno'}
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={resetForm}>
-                    Cancelar
-                  </button>
-                </div>
-              </form>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+
+          <section className='form-section' aria-labelledby='terreno-observacoes-heading'>
+            <h3 id='terreno-observacoes-heading'>Observações</h3>
+            <div className='form-group'>
+              <textarea
+                id='terreno-observacoes'
+                className='textarea-field'
+                rows={4}
+                aria-labelledby='terreno-observacoes-heading'
+                value={formTerreno.observacoes}
+                onChange={(e) => setFormTerreno((s) => ({ ...s, observacoes: e.target.value }))}
+              />
+            </div>
+          </section>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={terrenoParaExcluir !== null}
+        title={terrenoParaExcluir
+          ? `Excluir terreno em ${formatAddressLine(terrenoParaExcluir)}`
+          : 'Excluir terreno'}
+        message='Deseja realmente excluir este terreno? Esta ação não pode ser desfeita.'
+        errorFallback='Falha ao excluir terreno.'
+        onCancel={() => setTerrenoParaExcluir(null)}
+        onConfirm={excluirTerreno}
+      />
 
       <section className='card'>
         <div className='table-scroll'>
@@ -446,7 +474,7 @@ export default function TerrenosPage() {
                     <button type='button' className='button button-outline' onClick={() => editarTerreno(terreno)}>
                       Editar
                     </button>
-                    <button type='button' className='button button-secondary' onClick={() => excluirTerreno(terreno.id)}>
+                    <button type='button' className='button button-secondary' onClick={() => setTerrenoParaExcluir(terreno)}>
                       Excluir
                     </button>
                   </td>

@@ -16,6 +16,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -45,10 +46,11 @@ public class Locatario {
     @Column(name = "email", nullable = false)
     private String email;
 
-    @Column(name = "telefone", nullable = false)
+    @Column(name = "telefone", nullable = true)
     private String telefone;
 
-    @Column(name = "celular")
+    @NotBlank
+    @Column(name = "celular", nullable = false)
     private String celular;
 
     @Column(name = "endereco", nullable = false, columnDefinition = "text")

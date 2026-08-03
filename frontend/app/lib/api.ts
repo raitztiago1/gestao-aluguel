@@ -118,8 +118,4 @@ export async function resetPassword(token: string, novaSenha: string): Promise<v
   return requestJson('/api/auth/reset-password', 'POST', { token, novaSenha });
 }
 
-export function getApiBaseUrl(): string {
-  return API_BASE;
-}
-
 export { ApiError, getDefaultMessageForStatus };

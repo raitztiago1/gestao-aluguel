@@ -65,7 +65,7 @@ public class Fiador {
     @Column(name = "email", length = 100)
     private String email;
 
-    @Column(name = "telefone", nullable = false, length = 20)
+    @Column(name = "telefone", nullable = true, length = 20)
     private String telefone;
 
     @Column(name = "endereco", nullable = false, columnDefinition = "text")
