@@ -3,12 +3,13 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import AddressFields from '../components/AddressFields';
 import AppHeader from '../components/AppHeader';
+import ConfirmDialog from '../components/ConfirmDialog';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import Modal from '../components/Modal';
 import SortableTh from '../components/SortableTh';
 import { useCepLookup } from '../hooks/useCepLookup';
 import { useAuthGuard } from '../hooks/useAuth';
-import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import {
@@ -102,6 +103,7 @@ export default function LocatariosPage() {
   const [formLocatario, setFormLocatario] = useState<LocatarioForm>(defaultLocatarioForm);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [locatarioParaExcluir, setLocatarioParaExcluir] = useState<Locatario | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -252,13 +254,15 @@ export default function LocatariosPage() {
     resetCepRef();
   };
 
-  const excluirLocatario = async (id: number) => {
-    if (!window.confirm('Deseja realmente excluir este locatário?')) return;
+  const excluirLocatario = async () => {
+    if (!locatarioParaExcluir) return;
+
     try {
-      await requestJson<void>(`/api/locatarios/${id}`, 'DELETE');
+      await requestJson<void>(`/api/locatarios/${locatarioParaExcluir.id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
       setErro(getErrorMessage(err, 'Falha ao excluir locatário.'));
+      throw err;
     }
   };
 
@@ -269,8 +273,6 @@ export default function LocatariosPage() {
     setErroModal(null);
     resetCepRef();
   };
-
-  useEscapeKey(resetForm, showModal);
 
   const abrirNovaFormulario = () => {
     setModoEdicao(false);
@@ -340,145 +342,168 @@ export default function LocatariosPage() {
         </button>
       </div>
 
-      {showModal && (
-        <div className='modal-backdrop' onClick={resetForm}>
-          <div className='modal' onClick={(event) => event.stopPropagation()}>
-            <div className='modal-header'>
-              <div>
-                <h2>{modoEdicao ? 'Editar locatário' : 'Novo locatário'}</h2>
-                <p className='modal-description'>Preencha os dados de contato e endereço.</p>
-              </div>
-              <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
-            </div>
-
-            <div className='modal-content'>
-              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
-              <form onSubmit={salvarLocatario} className='form-grid'>
-                <div className='form-group'>
-                  <label htmlFor='locatario-tipo'>Tipo de pessoa</label>
-                  <select
-                    id='locatario-tipo'
-                    className='select-field'
-                    value={formLocatario.tipoPessoa}
-                    onChange={(e) => {
-                      const tipo = e.target.value as TipoPessoa;
-                      setFormLocatario((s) => ({
-                        ...s,
-                        tipoPessoa: tipo,
-                        cpfCnpj: maskCpfCnpj(s.cpfCnpj, tipo)
-                      }));
-                    }}
-                    required
-                    aria-required='true'
-                  >
-                    <option value='FISICA'>Pessoa física</option>
-                    <option value='JURIDICA'>Pessoa jurídica</option>
-                  </select>
-                </div>
-
-                <div className='form-group'>
-                  <label htmlFor='locatario-nome'>Nome <span className='required-star' aria-hidden='true'>*</span></label>
-                  <input
-                    id='locatario-nome'
-                    className='input-field'
-                    type='text'
-                    required
-                    aria-required='true'
-                    value={formLocatario.nome}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
-                  />
-                </div>
-
-                <div className='form-group'>
-                  <label htmlFor='locatario-documento'>
-                    {formLocatario.tipoPessoa === 'JURIDICA' ? 'CNPJ' : 'CPF'}{' '}
-                    <span className='required-star' aria-hidden='true'>*</span>
-                  </label>
-                  <MaskedInput
-                    id='locatario-documento'
-                    mask='cpfCnpj'
-                    tipoPessoa={formLocatario.tipoPessoa}
-                    required
-                    aria-required='true'
-                    value={formLocatario.cpfCnpj}
-                    onValueChange={(cpfCnpj) => setFormLocatario((s) => ({ ...s, cpfCnpj }))}
-                    placeholder={formLocatario.tipoPessoa === 'JURIDICA' ? '00.000.000/0000-00' : '000.000.000-00'}
-                    inputMode='numeric'
-                  />
-                </div>
-
-                <div className='form-group'>
-                  <label htmlFor='locatario-email'>E-mail <span className='required-star' aria-hidden='true'>*</span></label>
-                  <input
-                    id='locatario-email'
-                    className='input-field'
-                    type='email'
-                    required
-                    aria-required='true'
-                    value={formLocatario.email}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
-                  />
-                </div>
-
-                <div className='form-grid-two'>
-                  <div className='form-group'>
-                    <label htmlFor='locatario-celular'>Celular <span className='required-star' aria-hidden='true'>*</span></label>
-                    <MaskedInput
-                      id='locatario-celular'
-                      mask='phone'
-                      required
-                      aria-required='true'
-                      value={formLocatario.celular}
-                      onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
-                      placeholder='(00) 00000-0000'
-                      inputMode='tel'
-                    />
-                  </div>
-                  <div className='form-group'>
-                    <label htmlFor='locatario-telefone'>Telefone</label>
-                    <MaskedInput
-                      id='locatario-telefone'
-                      mask='phone'
-                      value={formLocatario.telefone}
-                      onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
-                      placeholder='(00) 0000-0000'
-                      inputMode='tel'
-                    />
-                  </div>
-                </div>
-
-                <AddressFields
-                  idPrefix='locatario-endereco'
+      <Modal
+        isOpen={showModal}
+        title={modoEdicao ? 'Editar locatário' : 'Novo locatário'}
+        description='Preencha os dados de identificação, contato, endereço e documentos.'
+        onClose={resetForm}
+        closeOnBackdrop={false}
+        actions={(
+          <>
+            <button
+              type='submit'
+              form='locatario-form'
+              className='button button-primary'
+            >
+              {modoEdicao ? 'Salvar alterações' : 'Cadastrar locatário'}
+            </button>
+            <button type='button' className='button button-secondary' onClick={resetForm}>
+              Cancelar
+            </button>
+          </>
+        )}
+      >
+        {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
+        <form id='locatario-form' onSubmit={salvarLocatario} className='form-grid'>
+          <section className='form-section' aria-labelledby='locatario-identificacao-heading'>
+            <h3 id='locatario-identificacao-heading'>Identificação</h3>
+            <div className='form-grid'>
+              <div className='form-group'>
+                <label htmlFor='locatario-tipo'>Tipo de pessoa</label>
+                <select
+                  id='locatario-tipo'
+                  className='select-field'
+                  value={formLocatario.tipoPessoa}
+                  onChange={(e) => {
+                    const tipo = e.target.value as TipoPessoa;
+                    setFormLocatario((s) => ({
+                      ...s,
+                      tipoPessoa: tipo,
+                      cpfCnpj: maskCpfCnpj(s.cpfCnpj, tipo)
+                    }));
+                  }}
                   required
-                  value={formLocatario}
-                  onChange={(patch) => setFormLocatario((s) => ({ ...s, ...patch }))}
-                  onCepChange={(v) => handleCepChange(v, (cep) => setFormLocatario((s) => ({ ...s, cep })))}
-                />
+                  aria-required='true'
+                >
+                  <option value='FISICA'>Pessoa física</option>
+                  <option value='JURIDICA'>Pessoa jurídica</option>
+                </select>
+              </div>
 
+              <div className='form-group'>
+                <label htmlFor='locatario-nome'>Nome <span className='required-star' aria-hidden='true'>*</span></label>
+                <input
+                  id='locatario-nome'
+                  className='input-field'
+                  type='text'
+                  required
+                  aria-required='true'
+                  value={formLocatario.nome}
+                  onChange={(e) => setFormLocatario((s) => ({ ...s, nome: e.target.value }))}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className='form-section' aria-labelledby='locatario-contato-endereco-heading'>
+            <h3 id='locatario-contato-endereco-heading'>Contato e endereço</h3>
+            <div className='form-grid'>
+              <div className='form-group'>
+                <label htmlFor='locatario-email'>E-mail <span className='required-star' aria-hidden='true'>*</span></label>
+                <input
+                  id='locatario-email'
+                  className='input-field'
+                  type='email'
+                  required
+                  aria-required='true'
+                  value={formLocatario.email}
+                  onChange={(e) => setFormLocatario((s) => ({ ...s, email: e.target.value }))}
+                />
+              </div>
+
+              <div className='form-grid-two'>
                 <div className='form-group'>
-                  <label htmlFor='locatario-observacoes'>Observações</label>
-                  <textarea
-                    id='locatario-observacoes'
-                    className='textarea-field'
-                    rows={4}
-                    value={formLocatario.observacoes}
-                    onChange={(e) => setFormLocatario((s) => ({ ...s, observacoes: e.target.value }))}
+                  <label htmlFor='locatario-celular'>Celular <span className='required-star' aria-hidden='true'>*</span></label>
+                  <MaskedInput
+                    id='locatario-celular'
+                    mask='phone'
+                    required
+                    aria-required='true'
+                    value={formLocatario.celular}
+                    onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
+                    placeholder='(00) 00000-0000'
+                    inputMode='tel'
                   />
                 </div>
-
-                <div className='form-actions'>
-                  <button type='submit' className='button button-primary'>
-                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar locatário'}
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={resetForm}>
-                    Cancelar
-                  </button>
+                <div className='form-group'>
+                  <label htmlFor='locatario-telefone'>Telefone</label>
+                  <MaskedInput
+                    id='locatario-telefone'
+                    mask='phone'
+                    value={formLocatario.telefone}
+                    onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
+                    placeholder='(00) 0000-0000'
+                    inputMode='tel'
+                  />
                 </div>
-              </form>
+              </div>
+
+              <AddressFields
+                idPrefix='locatario-endereco'
+                required
+                value={formLocatario}
+                onChange={(patch) => setFormLocatario((s) => ({ ...s, ...patch }))}
+                onCepChange={(v) => handleCepChange(v, (cep) => setFormLocatario((s) => ({ ...s, cep })))}
+              />
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+
+          <section className='form-section' aria-labelledby='locatario-documentos-heading'>
+            <h3 id='locatario-documentos-heading'>Documentos e observações</h3>
+            <div className='form-grid'>
+              <div className='form-group'>
+                <label htmlFor='locatario-documento'>
+                  {formLocatario.tipoPessoa === 'JURIDICA' ? 'CNPJ' : 'CPF'}{' '}
+                  <span className='required-star' aria-hidden='true'>*</span>
+                </label>
+                <MaskedInput
+                  id='locatario-documento'
+                  mask='cpfCnpj'
+                  tipoPessoa={formLocatario.tipoPessoa}
+                  required
+                  aria-required='true'
+                  value={formLocatario.cpfCnpj}
+                  onValueChange={(cpfCnpj) => setFormLocatario((s) => ({ ...s, cpfCnpj }))}
+                  placeholder={formLocatario.tipoPessoa === 'JURIDICA' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  inputMode='numeric'
+                />
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='locatario-observacoes'>Observações</label>
+                <textarea
+                  id='locatario-observacoes'
+                  className='textarea-field'
+                  rows={4}
+                  value={formLocatario.observacoes}
+                  onChange={(e) => setFormLocatario((s) => ({ ...s, observacoes: e.target.value }))}
+                />
+              </div>
+            </div>
+          </section>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={locatarioParaExcluir !== null}
+        title={locatarioParaExcluir
+          ? `Excluir locatário ${locatarioParaExcluir.nome}`
+          : 'Excluir locatário'}
+        message='Deseja realmente excluir este locatário? Esta ação não pode ser desfeita.'
+        errorFallback='Falha ao excluir locatário.'
+        onCancel={() => setLocatarioParaExcluir(null)}
+        onConfirm={excluirLocatario}
+      />
 
       <section className='card'>
         <div className='table-scroll'>
@@ -515,7 +540,7 @@ export default function LocatariosPage() {
                     <button type='button' className='button button-outline' onClick={() => editarLocatario(item)}>
                       Editar
                     </button>
-                    <button type='button' className='button button-secondary' onClick={() => excluirLocatario(item.id)}>
+                    <button type='button' className='button button-secondary' onClick={() => setLocatarioParaExcluir(item)}>
                       Excluir
                     </button>
                   </td>

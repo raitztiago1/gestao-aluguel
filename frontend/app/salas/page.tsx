@@ -2,12 +2,13 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
+import ConfirmDialog from '../components/ConfirmDialog';
 import ErrorAlert from '../components/ErrorAlert';
 import MaskedInput from '../components/MaskedInput';
+import Modal from '../components/Modal';
 import SortableTh from '../components/SortableTh';
 import StatusBadge from '../components/StatusBadge';
 import { useAuthGuard } from '../hooks/useAuth';
-import { useEscapeKey } from '../hooks/useEscapeKey';
 import { fetchJson, requestJson } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { formatAddressLine, formatArea, formatAreaInput, formatTerrenoOption } from '../lib/format';
@@ -61,6 +62,7 @@ export default function SalasPage() {
   const [formSala, setFormSala] = useState<SalaForm>(defaultSalaForm);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [salaParaExcluir, setSalaParaExcluir] = useState<Sala | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -152,13 +154,15 @@ export default function SalasPage() {
     setErroModal(null);
   };
 
-  const excluirSala = async (id: number) => {
-    if (!window.confirm('Deseja realmente excluir esta sala?')) return;
+  const excluirSala = async () => {
+    if (!salaParaExcluir) return;
+
     try {
-      await requestJson<void>(`/api/salas/${id}`, 'DELETE');
+      await requestJson<void>(`/api/salas/${salaParaExcluir.id}`, 'DELETE');
       await carregarDados();
     } catch (err) {
       setErro(getErrorMessage(err, 'Falha ao excluir sala.'));
+      throw err;
     }
   };
 
@@ -168,8 +172,6 @@ export default function SalasPage() {
     setShowModal(false);
     setErroModal(null);
   };
-
-  useEscapeKey(resetForm, showModal);
 
   const handleSort = (key: SalaSortKey) => {
     setSortConfig((current) => ({
@@ -241,25 +243,33 @@ export default function SalasPage() {
       {carregando && <div className='alert-card'>Carregando...</div>}
       {erro && <ErrorAlert message={erro} onDismiss={() => setErro(null)} />}
 
-      {showModal && (
-        <div className='modal-backdrop' onClick={resetForm}>
-          <div className='modal' onClick={(event) => event.stopPropagation()}>
-            <div className='modal-header'>
-              <div>
-                <h2>{modoEdicao ? 'Editar sala' : 'Nova sala'}</h2>
-                <p className='modal-description'>
-                  {modoEdicao
-                    ? 'Atualize os dados da sala ou altere o status de manutenção.'
-                    : 'Selecione o terreno e informe a identificação e metragem da sala.'}
-                </p>
-              </div>
-              <button className='modal-close' onClick={resetForm} aria-label='Fechar modal'>×</button>
-            </div>
-
-            <div className='modal-content'>
-              {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
-              <form onSubmit={salvarSala} className='form-grid'>
-                <section className='form-section' aria-labelledby='sala-dados-heading'>
+      <Modal
+        isOpen={showModal}
+        title={modoEdicao ? 'Editar sala' : 'Nova sala'}
+        description={modoEdicao
+          ? 'Atualize os dados da sala ou altere o status de manutenção.'
+          : 'Selecione o terreno e informe a identificação e metragem da sala.'}
+        onClose={resetForm}
+        closeOnBackdrop={false}
+        actions={(
+          <>
+            <button
+              type='submit'
+              form='sala-form'
+              className='button button-primary'
+              disabled={!modoEdicao && terrenosDisponiveisParaSala.length === 0}
+            >
+              {modoEdicao ? 'Salvar alterações' : 'Cadastrar sala'}
+            </button>
+            <button type='button' className='button button-secondary' onClick={resetForm}>
+              Cancelar
+            </button>
+          </>
+        )}
+      >
+        {erroModal && <ErrorAlert message={erroModal} onDismiss={() => setErroModal(null)} />}
+        <form id='sala-form' onSubmit={salvarSala} className='form-grid'>
+          <section className='form-section' aria-labelledby='sala-dados-heading'>
                   <h3 id='sala-dados-heading'>Dados da sala</h3>
                   <div className='form-grid'>
                     <div className='form-group'>
@@ -324,7 +334,7 @@ export default function SalasPage() {
                   </div>
                 </section>
 
-                {modoEdicao && (
+          {modoEdicao && (
                   <section className='form-section' aria-labelledby='sala-status-heading'>
                     <div className='form-status-header'>
                       <h3 id='sala-status-heading'>Status da sala</h3>
@@ -360,9 +370,9 @@ export default function SalasPage() {
                       </label>
                     )}
                   </section>
-                )}
+          )}
 
-                <section className='form-section' aria-labelledby='sala-observacoes-heading'>
+          <section className='form-section' aria-labelledby='sala-observacoes-heading'>
                   <h3 id='sala-observacoes-heading'>Observações</h3>
                   <div className='form-group'>
                     <textarea
@@ -375,25 +385,19 @@ export default function SalasPage() {
                       onChange={(e) => setFormSala((s) => ({ ...s, observacoes: e.target.value }))}
                     />
                   </div>
-                </section>
+          </section>
 
-                <div className='form-actions'>
-                  <button
-                    type='submit'
-                    className='button button-primary'
-                    disabled={!modoEdicao && terrenosDisponiveisParaSala.length === 0}
-                  >
-                    {modoEdicao ? 'Salvar alterações' : 'Cadastrar sala'}
-                  </button>
-                  <button type='button' className='button button-secondary' onClick={resetForm}>
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={salaParaExcluir !== null}
+        title={salaParaExcluir ? `Excluir sala ${salaParaExcluir.identificacao}` : 'Excluir sala'}
+        message='Deseja realmente excluir esta sala? Esta ação não pode ser desfeita.'
+        errorFallback='Falha ao excluir sala.'
+        onCancel={() => setSalaParaExcluir(null)}
+        onConfirm={excluirSala}
+      />
 
       <section className='card'>
         <div className='table-scroll'>
@@ -427,7 +431,11 @@ export default function SalasPage() {
                     <button type='button' className='button button-outline' onClick={() => editarSala(sala)}>
                       Editar
                     </button>
-                    <button type='button' className='button button-secondary' onClick={() => excluirSala(sala.id)}>
+                    <button
+                      type='button'
+                      className='button button-secondary'
+                      onClick={() => setSalaParaExcluir(sala)}
+                    >
                       Excluir
                     </button>
                   </td>
