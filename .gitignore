@@ -39,9 +39,24 @@ frontend/.next/
 
 ### Env ###
 .env
+.env*.local
 
 ### Playwright MCP (debug artifacts) ###
 .playwright-mcp/
 
 ### TypeScript build cache ###
 *.tsbuildinfo
+
+### Local runtime and tooling artifacts ###
+tmp/
+.agents/
+backups/
+frontend/out/
+frontend/.turbo/
+.vercel/
+*.log
+npm-debug.log*
+
+### OS artifacts ###
+Thumbs.db
+.DS_Store

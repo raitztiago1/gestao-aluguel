@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import com.felicioecavalaro.gestao_aluguel.domain.model.Locatario;
 import com.felicioecavalaro.gestao_aluguel.service.LocatarioService;
@@ -36,12 +37,12 @@ public class LocatarioController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Locatario create(@RequestBody Locatario locatario) {
+    public Locatario create(@Valid @RequestBody Locatario locatario) {
         return service.create(locatario);
     }
 
     @PutMapping("/{id}")
-    public Locatario update(@PathVariable Long id, @RequestBody Locatario locatario) {
+    public Locatario update(@PathVariable Long id, @Valid @RequestBody Locatario locatario) {
         return service.update(id, locatario);
     }
 

@@ -30,7 +30,7 @@ type Locatario = {
   cpfCnpj: string;
   email: string;
   telefone: string;
-  celular?: string;
+  celular: string;
   endereco: string;
   numero?: string;
   complemento?: string;
@@ -83,8 +83,8 @@ function locatarioToForm(loc: Locatario): LocatarioForm {
     nome: loc.nome,
     cpfCnpj: maskCpfCnpj(loc.cpfCnpj, loc.tipoPessoa),
     email: loc.email,
-    telefone: maskPhone(loc.telefone),
-    celular: loc.celular ? maskPhone(loc.celular) : '',
+  celular: loc.celular ? maskPhone(loc.celular) : '',
+  telefone: maskPhone(loc.telefone),
     endereco: loc.endereco,
     numero: loc.numero ?? '',
     complemento: loc.complemento ?? '',
@@ -220,7 +220,7 @@ export default function LocatariosPage() {
         cpfCnpj: onlyDigits(formLocatario.cpfCnpj),
         email: formLocatario.email.trim(),
         telefone: onlyDigits(formLocatario.telefone),
-        celular: formLocatario.celular ? onlyDigits(formLocatario.celular) : undefined,
+        celular: onlyDigits(formLocatario.celular),
         endereco: formLocatario.endereco.trim(),
         numero: formLocatario.numero.trim() || undefined,
         complemento: formLocatario.complemento.trim() || undefined,
@@ -422,26 +422,26 @@ export default function LocatariosPage() {
 
                 <div className='form-grid-two'>
                   <div className='form-group'>
-                    <label htmlFor='locatario-telefone'>Telefone <span className='required-star' aria-hidden='true'>*</span></label>
+                    <label htmlFor='locatario-celular'>Celular <span className='required-star' aria-hidden='true'>*</span></label>
                     <MaskedInput
-                      id='locatario-telefone'
+                      id='locatario-celular'
                       mask='phone'
                       required
                       aria-required='true'
-                      value={formLocatario.telefone}
-                      onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
-                      placeholder='(00) 0000-0000'
+                      value={formLocatario.celular}
+                      onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
+                      placeholder='(00) 00000-0000'
                       inputMode='tel'
                     />
                   </div>
                   <div className='form-group'>
-                    <label htmlFor='locatario-celular'>Celular</label>
+                    <label htmlFor='locatario-telefone'>Telefone</label>
                     <MaskedInput
-                      id='locatario-celular'
+                      id='locatario-telefone'
                       mask='phone'
-                      value={formLocatario.celular}
-                      onValueChange={(celular) => setFormLocatario((s) => ({ ...s, celular }))}
-                      placeholder='(00) 00000-0000'
+                      value={formLocatario.telefone}
+                      onValueChange={(telefone) => setFormLocatario((s) => ({ ...s, telefone }))}
+                      placeholder='(00) 0000-0000'
                       inputMode='tel'
                     />
                   </div>

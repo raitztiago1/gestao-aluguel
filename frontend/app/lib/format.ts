@@ -1,7 +1,6 @@
-import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from './masks';
+import { maskCpfCnpj, maskPhone, onlyDigits } from './masks';
 import {
   labelStatusContrato,
-  labelStatusSala,
   labelTipoPessoa,
   labelTipoTerreno
 } from './labels';
@@ -39,12 +38,6 @@ export function formatAreaInput(value?: number | null): string {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function formatCepDisplay(cep?: string | null): string {
-  if (!cep) return '';
-  const digits = onlyDigits(cep);
-  return digits ? maskCep(digits) : cep;
-}
-
 export function formatCpfCnpjDisplay(value?: string | null, tipo?: 'FISICA' | 'JURIDICA'): string {
   if (!value) return '—';
   const digits = onlyDigits(value);
@@ -65,15 +58,6 @@ export function formatAddressLine(parts: AddressParts): string {
   const cityState = [parts.cidade, parts.estado].filter(Boolean).join('/');
   const segments = [street, parts.bairro, cityState].filter((s) => s && String(s).trim());
   return segments.length > 0 ? segments.join(' · ') : 'Endereço não informado';
-}
-
-export function formatAddressShort(parts: AddressParts): string {
-  const line = formatAddressLine(parts);
-  if (parts.cep) {
-    const cep = formatCepDisplay(parts.cep);
-    return cep ? `${line} · CEP ${cep}` : line;
-  }
-  return line;
 }
 
 export function formatTerrenoOption(terreno: AddressParts & { tipo?: string | null }): string {
@@ -99,4 +83,4 @@ export function formatLocatarioOption(loc: { nome?: string | null; cpfCnpj?: str
   return `${nome}${doc}`;
 }
 
-export { labelTipoPessoa, labelTipoTerreno, labelStatusSala, labelStatusContrato };
+export { labelTipoPessoa, labelTipoTerreno, labelStatusContrato };
